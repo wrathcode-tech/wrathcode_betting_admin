@@ -1,0 +1,129 @@
+// Role-based access: roles and their permissions
+
+// Enterprise roles: Super Admin, Admin, Finance, Risk, Support (frontend-only)
+export const ROLES = {
+  SUPER_ADMIN: 'super_admin',
+  SUB_ADMIN: 'sub_admin', // Scoped by assignedUserIds; permissions from assigned roles
+  ADMIN: 'admin',
+  FINANCE: 'finance',
+  RISK: 'risk',
+  SUPPORT: 'support',
+  COMPLIANCE: 'compliance', // alias
+  OPERATOR: 'operator',
+}
+
+export const PERMISSIONS = {
+  // Dashboard & reports
+  VIEW_DASHBOARD: 'view_dashboard',
+  VIEW_REPORTS: 'view_reports',
+  EXPORT_REPORTS: 'export_reports',
+
+  // Users
+  VIEW_USERS: 'view_users',
+  EDIT_USERS: 'edit_users',
+  BAN_USERS: 'ban_users',
+
+  // Wallets & money
+  VIEW_WALLETS: 'view_wallets',
+  ADJUST_WALLETS: 'adjust_wallets',
+  VIEW_DEPOSITS: 'view_deposits',
+  VIEW_WITHDRAWALS: 'view_withdrawals',
+  APPROVE_WITHDRAWALS: 'approve_withdrawals',
+  VIEW_TRANSACTIONS: 'view_transactions',
+
+  // Games & betting
+  VIEW_GAMES: 'view_games',
+  EDIT_GAMES: 'edit_games',
+  MANAGE_BETTING: 'manage_betting',
+
+  // Bonuses & referrals
+  VIEW_BONUSES: 'view_bonuses',
+  MANAGE_BONUSES: 'manage_bonuses',
+  VIEW_REFERRALS: 'view_referrals',
+  MANAGE_REFERRALS: 'manage_referrals',
+
+  // Risk & fraud
+  VIEW_RISK: 'view_risk',
+  MANAGE_RISK_RULES: 'manage_risk_rules',
+  RESOLVE_ALERTS: 'resolve_alerts',
+
+  // CMS
+  VIEW_CMS: 'view_cms',
+  EDIT_CMS: 'edit_cms',
+
+  // Support
+  VIEW_TICKETS: 'view_tickets',
+  REPLY_TICKETS: 'reply_tickets',
+  CLOSE_TICKETS: 'close_tickets',
+
+  // Notifications
+  VIEW_NOTIFICATIONS: 'view_notifications',
+  SEND_NOTIFICATIONS: 'send_notifications',
+
+  // Audit & settings
+  VIEW_AUDIT_LOG: 'view_audit_log',
+  VIEW_SETTINGS: 'view_settings',
+  EDIT_SETTINGS: 'edit_settings',
+  MANAGE_ROLES: 'manage_roles',
+}
+
+const ROLE_PERMISSIONS = {
+  [ROLES.SUPER_ADMIN]: Object.values(PERMISSIONS),
+  [ROLES.ADMIN]: [
+    PERMISSIONS.VIEW_DASHBOARD, PERMISSIONS.VIEW_REPORTS, PERMISSIONS.EXPORT_REPORTS,
+    PERMISSIONS.VIEW_USERS, PERMISSIONS.EDIT_USERS, PERMISSIONS.BAN_USERS,
+    PERMISSIONS.VIEW_WALLETS, PERMISSIONS.ADJUST_WALLETS,
+    PERMISSIONS.VIEW_DEPOSITS, PERMISSIONS.VIEW_WITHDRAWALS, PERMISSIONS.APPROVE_WITHDRAWALS, PERMISSIONS.VIEW_TRANSACTIONS,
+    PERMISSIONS.VIEW_GAMES, PERMISSIONS.EDIT_GAMES, PERMISSIONS.MANAGE_BETTING,
+    PERMISSIONS.VIEW_BONUSES, PERMISSIONS.MANAGE_BONUSES, PERMISSIONS.VIEW_REFERRALS, PERMISSIONS.MANAGE_REFERRALS,
+    PERMISSIONS.VIEW_RISK, PERMISSIONS.MANAGE_RISK_RULES, PERMISSIONS.RESOLVE_ALERTS,
+    PERMISSIONS.VIEW_CMS, PERMISSIONS.EDIT_CMS,
+    PERMISSIONS.VIEW_TICKETS, PERMISSIONS.REPLY_TICKETS, PERMISSIONS.CLOSE_TICKETS,
+    PERMISSIONS.VIEW_NOTIFICATIONS, PERMISSIONS.SEND_NOTIFICATIONS,
+    PERMISSIONS.VIEW_AUDIT_LOG, PERMISSIONS.VIEW_SETTINGS, PERMISSIONS.EDIT_SETTINGS,
+  ],
+  [ROLES.FINANCE]: [
+    PERMISSIONS.VIEW_DASHBOARD, PERMISSIONS.VIEW_REPORTS, PERMISSIONS.EXPORT_REPORTS,
+    PERMISSIONS.VIEW_USERS,
+    PERMISSIONS.VIEW_WALLETS, PERMISSIONS.ADJUST_WALLETS,
+    PERMISSIONS.VIEW_DEPOSITS, PERMISSIONS.VIEW_WITHDRAWALS, PERMISSIONS.APPROVE_WITHDRAWALS, PERMISSIONS.VIEW_TRANSACTIONS,
+    PERMISSIONS.VIEW_BONUSES, PERMISSIONS.VIEW_REFERRALS,
+    PERMISSIONS.VIEW_AUDIT_LOG,
+  ],
+  [ROLES.RISK]: [
+    PERMISSIONS.VIEW_DASHBOARD, PERMISSIONS.VIEW_USERS,
+    PERMISSIONS.VIEW_WALLETS, PERMISSIONS.VIEW_DEPOSITS, PERMISSIONS.VIEW_WITHDRAWALS, PERMISSIONS.VIEW_TRANSACTIONS,
+    PERMISSIONS.VIEW_RISK, PERMISSIONS.MANAGE_RISK_RULES, PERMISSIONS.RESOLVE_ALERTS, PERMISSIONS.VIEW_AUDIT_LOG,
+  ],
+  [ROLES.COMPLIANCE]: [
+    PERMISSIONS.VIEW_DASHBOARD, PERMISSIONS.VIEW_USERS,
+    PERMISSIONS.VIEW_WALLETS, PERMISSIONS.VIEW_DEPOSITS, PERMISSIONS.VIEW_WITHDRAWALS, PERMISSIONS.VIEW_TRANSACTIONS,
+    PERMISSIONS.VIEW_RISK, PERMISSIONS.RESOLVE_ALERTS, PERMISSIONS.VIEW_AUDIT_LOG,
+  ],
+  [ROLES.SUPPORT]: [
+    PERMISSIONS.VIEW_DASHBOARD, PERMISSIONS.VIEW_USERS,
+    PERMISSIONS.VIEW_TICKETS, PERMISSIONS.REPLY_TICKETS, PERMISSIONS.CLOSE_TICKETS,
+  ],
+  [ROLES.OPERATOR]: [
+    PERMISSIONS.VIEW_DASHBOARD, PERMISSIONS.VIEW_REPORTS,
+    PERMISSIONS.VIEW_USERS, PERMISSIONS.VIEW_GAMES, PERMISSIONS.VIEW_DEPOSITS, PERMISSIONS.VIEW_WITHDRAWALS,
+    PERMISSIONS.VIEW_TICKETS, PERMISSIONS.REPLY_TICKETS,
+  ],
+}
+
+export function getPermissionsForRole(role) {
+  return ROLE_PERMISSIONS[role] || []
+}
+
+/** Merge permissions from multiple roles (e.g. sub_admin with roles: ['support', 'finance']). */
+export function getPermissionsForRoles(roles) {
+  if (!Array.isArray(roles) || roles.length === 0) return []
+  const set = new Set()
+  roles.forEach((r) => getPermissionsForRole(r).forEach((p) => set.add(p)))
+  return [...set]
+}
+
+export function hasRolePermission(role, permission) {
+  const perms = getPermissionsForRole(role)
+  return perms.includes(permission)
+}

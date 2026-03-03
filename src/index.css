@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Light theme */
+html {
+  color-scheme: light;
+  --bg-body: #f9fafb;
+  --text-primary: #111827;
+  --bg-card: #ffffff;
+  --border: #e5e7eb;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--bg-body);
+  color: #111827;
+}
+
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid rgba(20, 184, 166, 0.5);
+  outline-offset: 2px;
+}
+
+/* Recharts tooltip – light */
+.recharts-default-tooltip {
+  padding: 10px 14px !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+
+/* react-data-table-component – light theme */
+.rdt_Table {
+  border-radius: 0.75rem;
+  background-color: #ffffff !important;
+  border: 1px solid #e5e7eb;
+}
+.rdt_TableHeadRow {
+  background-color: #f9fafb !important;
+  border-bottom: 1px solid #e5e7eb;
+}
+.rdt_TableBody .rdt_TableRow {
+  background-color: #ffffff !important;
+  border-bottom: 1px solid #f3f4f6;
+}
+.rdt_TableBody .rdt_TableRow:hover {
+  background-color: #f0fdfa !important;
+}
+.rdt_TableCell {
+  color: #374151 !important;
+  border-right: none !important;
+  background-color: transparent !important;
+}
+.rdt_TableCol {
+  color: #6b7280 !important;
+  font-weight: 600;
+  border-right: none !important;
+  background-color: transparent !important;
+}
+.rdt_Pagination {
+  background-color: #f9fafb !important;
+  border-top: 1px solid #e5e7eb;
+  color: #6b7280;
+}
+.rdt_Pagination button {
+  color: #374151 !important;
+}
+.rdt_Input {
+  background-color: #ffffff !important;
+  border-color: #d1d5db !important;
+  color: #111827 !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .transition-sidebar {
+    transition: width 0.3s ease-in-out;
+  }
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid rgba(20, 184, 166, 0.5);
+  outline-offset: 2px;
+}
+.dashboard_hd_top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 32px;
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 40%, #14b8a6 70%, #5eead4 100%);
+  border-radius: 0 0 20px 20px;
+  margin-bottom: 1.75rem;
+  box-shadow: 0 4px 20px rgba(15, 118, 110, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+
+.dashboard_hd_top h1{ color: #fff; }
+.full_width {
+  width: 100%;
+  align-items: center;
+}
+
+.full_width span.px-3.font-medium {
+  background-color: rgba(15, 118, 110, 0.4);
+  color: #fff;
+}
+
+.homecard{ background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  padding: 1.5rem;
+  border-radius: 14px;
+  position: relative;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  overflow: hidden; }
+
+  .homecard:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+    border-color: rgba(15, 118, 110, 0.25);
+}
+
+.mt_card_space{ margin-top: 1.5rem !important; }
