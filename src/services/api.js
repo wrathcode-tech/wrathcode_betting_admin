@@ -21,6 +21,9 @@ import {
   userTickets,
   userReferralData,
   gamesData,
+  betsData,
+  betSummary,
+  accountStatementData,
   bonusesData,
   bonusAnalytics,
   referralTree,
@@ -111,6 +114,50 @@ export const rejectWithdrawal = (id, reason) => Promise.resolve({ data: { ok: tr
 // Games
 export const getGames = () => Promise.resolve({ data: gamesData })
 export const updateGame = (id, payload) => Promise.resolve({ data: { ...gamesData.find((g) => g.id === Number(id)), ...payload } })
+
+// Account Statement
+export function getAccountStatement(params = {}) {
+  let list = [...accountStatementData]
+  if (params.fromDate) {
+    const from = new Date(params.fromDate)
+    list = list.filter((r) => new Date(r.date) >= from)
+  }
+  if (params.toDate) {
+    const to = new Date(params.toDate)
+    to.setHours(23, 59, 59, 999)
+    list = list.filter((r) => new Date(r.date) <= to)
+  }
+  if (params.userFilter && params.userFilter.trim()) {
+    const q = params.userFilter.toLowerCase().trim()
+    list = list.filter((r) => String(r.from).toLowerCase().includes(q) || String(r.to).toLowerCase().includes(q))
+  }
+  if (params.transactionType && params.transactionType !== 'All') {
+    list = list.filter((r) => r.transaction === params.transactionType)
+  }
+  list = [...list].sort((a, b) => new Date(b.date) - new Date(a.date))
+  return Promise.resolve({ data: list })
+}
+
+// Bets – list, summary, settle, cancel
+export const getBets = (params = {}) => Promise.resolve({ data: [...betsData] })
+export const getBetById = (id) => Promise.resolve({ data: betsData.find((b) => b.id === id) || betsData[0] })
+export const getBetSummary = (params = {}) => Promise.resolve({ data: betSummary })
+export function settleBet(betId, result) {
+  const bet = betsData.find((b) => b.id === betId)
+  if (!bet || bet.status !== 'open') return Promise.resolve({ data: { ok: false } })
+  bet.status = 'settled'
+  bet.settledPl = result === 'win' ? (bet.potentialPayout - bet.stake) : -bet.stake
+  bet.settledAt = new Date().toISOString().slice(0, 19).replace('T', ' ')
+  return Promise.resolve({ data: { ok: true, bet } })
+}
+export function cancelBet(betId) {
+  const bet = betsData.find((b) => b.id === betId)
+  if (!bet || bet.status !== 'open') return Promise.resolve({ data: { ok: false } })
+  bet.status = 'cancelled'
+  bet.settledPl = 0
+  bet.settledAt = new Date().toISOString().slice(0, 19).replace('T', ' ')
+  return Promise.resolve({ data: { ok: true, bet } })
+}
 
 // Bonuses
 export const getBonuses = () => Promise.resolve({ data: bonusesData })

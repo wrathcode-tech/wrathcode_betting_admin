@@ -142,8 +142,10 @@ export default function Deposits() {
         setData((prev) => prev.map((d) => (d.id === row.id ? { ...d, status: 'completed' } : d)))
         setEditedAmounts((prev) => { const next = { ...prev }; delete next[row.id]; return next })
         addToast('Deposit approved – user balance credited', 'success')
+      } else {
+        addToast(res.data?.message || 'Failed to approve deposit', 'error')
       }
-    })
+    }).catch(() => addToast('Failed to approve deposit', 'error'))
   }
 
   const handleRejectClick = (row) => {
@@ -169,8 +171,10 @@ export default function Deposits() {
         setData((prev) => prev.map((d) => (d.id === selectedDeposit.id ? { ...d, status: 'rejected', rejectReason: rejectReason.trim() } : d)))
         handleRejectClose()
         addToast('Deposit rejected', 'success')
+      } else {
+        addToast(res.data?.message || 'Failed to reject deposit', 'error')
       }
-    })
+    }).catch(() => addToast('Failed to reject deposit', 'error'))
   }
 
   const handleDownloadCSV = () => {

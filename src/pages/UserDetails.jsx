@@ -219,12 +219,17 @@ export default function UserDetails() {
                 <Row label="Email" value={user.email} />
                 <Row label="Mobile" value={user.phone || '–'} />
                 <Row label="Registered By" value={extended.registeredBy} />
+                <Row label="Country" value={user.country ? (user.country === 'IN' ? 'India' : user.country) : '–'} />
+                <Row label="Timezone" value={user.timezone || '–'} />
+                <Row label="Language" value={user.language ? (user.language === 'hi' ? 'Hindi' : user.language === 'en' ? 'English' : user.language) : '–'} />
               </Card>
               <Card title="Account" icon={HiUser}>
                 <Row label="UUID" value={user.uuid || user.id} />
                 <Row label="Referral" value={user.referralCode} />
                 <Row label="Status" value={<span className="text-teal-600 font-semibold">{user.status === 'active' ? 'Active' : user.status}</span>} />
+                <Row label="KYC Status" value={user.kyc ? user.kyc.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '–'} />
                 <Row label="Joined" value={formatDateTime(user.createdAt)} />
+                <Row label="Profile last updated" value={formatDateTime(user.updatedAt)} />
                 <Row label="Currency" value="INR" />
               </Card>
               <Card title="Security & Verification" icon={HiShieldCheck}>
@@ -236,6 +241,7 @@ export default function UserDetails() {
                 <Row label="Last Login IP" value={extended.lastLoginIp} />
               </Card>
               <Card title="Login Security" icon={HiLockClosed}>
+                <Row label="Password changed at" value={user.passwordChangedAt ? formatDateTime(user.passwordChangedAt) : 'Never'} />
                 <Row label="Failed Login Attempts" value={String(extended.failedLoginAttempts)} />
                 <Row label="Last Failed Login" value={extended.lastFailedLogin ? formatDateTime(extended.lastFailedLogin) : '–'} />
               </Card>

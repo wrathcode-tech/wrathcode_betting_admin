@@ -25,6 +25,8 @@ import Settings from './pages/Settings'
 import Profile from './pages/Profile'
 import SubAdminManagement from './pages/SubAdminManagement'
 import UserDetails from './pages/UserDetails'
+import Bets from './pages/Bets'
+import AccountSettlement from './pages/AccountSettlement'
 
 class ErrorBoundary extends Component {
   state = { hasError: false, error: null }
@@ -75,9 +77,11 @@ export default function App() {
                 <Route path="sub-admins" element={<ProtectedRoute requiredPermission={PERMISSIONS.MANAGE_ROLES}><SubAdminManagement /></ProtectedRoute>} />
                 <Route path="wallets" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_WALLETS}><Wallets /></ProtectedRoute>} />
                 <Route path="games" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_GAMES}><Games /></ProtectedRoute>} />
+                <Route path="bets" element={<ProtectedRoute requiredPermission={PERMISSIONS.MANAGE_BETTING}><Bets /></ProtectedRoute>} />
                 <Route path="deposits" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_DEPOSITS}><Deposits /></ProtectedRoute>} />
                 <Route path="withdrawals" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_WITHDRAWALS}><Withdrawals /></ProtectedRoute>} />
                 <Route path="transactions" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_TRANSACTIONS}><Transactions /></ProtectedRoute>} />
+                <Route path="account-settlement" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_ACCOUNT_STATEMENT}><AccountSettlement /></ProtectedRoute>} />
                 <Route path="bonuses" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_BONUSES}><Bonuses /></ProtectedRoute>} />
                 <Route path="referrals" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_REFERRALS}><Referrals /></ProtectedRoute>} />
                 <Route path="risk-fraud" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_RISK}><RiskFraud /></ProtectedRoute>} />

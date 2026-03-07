@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { HiSearch, HiDownload, HiCheck, HiX, HiArrowUp } from 'react-icons/hi'
 import PageBanner from '../components/PageBanner'
 import Badge from '../components/ui/Badge'
+import Modal from '../components/Modal'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
 import { PERMISSIONS } from '../constants/roles'
@@ -33,6 +34,9 @@ export default function Withdrawals() {
   const [activeTab, setActiveTab] = useState('all')
   const [currencyFilter, setCurrencyFilter] = useState('All')
   const [page, setPage] = useState(1)
+  const [showRejectModal, setShowRejectModal] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
+  const [selectedWithdrawal, setSelectedWithdrawal] = useState(null)
   const { addToast } = useToast()
   const { hasPermission, getAssignedUserIds } = useAuth()
   const canApprove = hasPermission(PERMISSIONS.APPROVE_WITHDRAWALS)
@@ -91,8 +95,19 @@ export default function Withdrawals() {
     addToast('Withdrawal approved', 'success')
   }
 
-  const handleReject = (id) => {
-    setData((prev) => prev.map((w) => (w.id === id ? { ...w, status: 'rejected', rejectReason: 'Rejected by Admin' } : w)))
+  const openRejectModal = (w) => {
+    setSelectedWithdrawal(w)
+    setRejectReason('')
+    setShowRejectModal(true)
+  }
+
+  const handleReject = () => {
+    if (!selectedWithdrawal) return
+    const reason = rejectReason.trim() || 'Rejected by Admin'
+    setData((prev) => prev.map((w) => (w.id === selectedWithdrawal.id ? { ...w, status: 'rejected', rejectReason: reason } : w)))
+    setShowRejectModal(false)
+    setSelectedWithdrawal(null)
+    setRejectReason('')
     addToast('Withdrawal rejected', 'success')
   }
 
@@ -181,7 +196,7 @@ export default function Withdrawals() {
                           <button type="button" onClick={() => handleApprove(w.id)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100">
                             <HiCheck className="w-4 h-4" /> Approve
                           </button>
-                          <button type="button" onClick={() => handleReject(w.id)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100">
+                          <button type="button" onClick={() => openRejectModal(w)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100">
                             <HiX className="w-4 h-4" /> Reject
                           </button>
                         </div>
@@ -211,6 +226,30 @@ export default function Withdrawals() {
           )
         )}
       </div>
+
+      <Modal open={showRejectModal} onClose={() => { setShowRejectModal(false); setSelectedWithdrawal(null); setRejectReason(''); }} title="Reject Withdrawal">
+        {selectedWithdrawal && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Reject withdrawal <strong>{selectedWithdrawal.id}</strong> – {selectedWithdrawal.user} – {formatAmount(selectedWithdrawal)}?
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
+              <input
+                type="text"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="e.g. Insufficient verification"
+                className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => { setShowRejectModal(false); setSelectedWithdrawal(null); }} className="px-4 py-2 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button type="button" onClick={handleReject} className="px-4 py-2 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600">Reject</button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

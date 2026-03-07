@@ -77,8 +77,12 @@ export default function Support() {
   function handleReply(e) {
     e.preventDefault()
     if (!selectedTicket || !replyText.trim()) return
-    addToast('Reply sent', 'success')
+    const newMsg = { from: 'agent', text: replyText.trim(), time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) }
+    const updatedTicket = { ...selectedTicket, messages: [...(selectedTicket.messages || []), newMsg] }
+    setTickets((prev) => prev.map((t) => (t.id === selectedTicket.id ? updatedTicket : t)))
+    setSelectedTicket(updatedTicket)
     setReplyText('')
+    addToast('Reply sent', 'success')
   }
 
   function updateStatus(id, status) {

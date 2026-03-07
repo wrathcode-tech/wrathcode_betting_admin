@@ -2,6 +2,7 @@
  * Light theme sidebar – reference style: uppercase section labels (MAIN, PLATFORM, …),
  * teal active state with left bar, red Logout at bottom.
  */
+import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   HiChartBar,
@@ -11,6 +12,7 @@ import {
   HiArrowUp,
   HiCurrencyDollar,
   HiCollection,
+  HiTicket,
   HiGift,
   HiUserGroup,
   HiShieldExclamation,
@@ -27,23 +29,46 @@ import { useLayout } from '../context/LayoutContext'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { PERMISSIONS } from '../constants/roles'
+import { getDeposits, getWithdrawals, getTickets } from '../services/api'
 
 const navSections = [
   { key: 'main', label: 'MAIN', pill: 'ACTIVE', items: [{ to: '/', label: 'Dashboard', icon: HiChartBar, permission: PERMISSIONS.VIEW_DASHBOARD }] },
   { key: 'platform', label: 'PLATFORM', pill: 'ACTIVE', items: [{ to: '/settings', label: 'Platform Configuration', icon: HiCog, permission: PERMISSIONS.VIEW_SETTINGS }] },
   { key: 'admin', label: 'ADMIN', items: [{ to: '/sub-admins', label: 'Sub Admin Management', icon: HiUsers, permission: PERMISSIONS.MANAGE_ROLES }, { to: '/audit-logs', label: 'Admin Logs', icon: HiClipboardList, permission: PERMISSIONS.VIEW_AUDIT_LOG }] },
   { key: 'traders', label: 'TRADERS', items: [{ to: '/users', label: 'User List', icon: HiUsers, permission: PERMISSIONS.VIEW_USERS }] },
-  { key: 'wallets', label: 'WALLETS & MONEY', items: [{ to: '/wallets', label: 'Wallets', icon: HiCash, permission: PERMISSIONS.VIEW_WALLETS }, { to: '/deposits', label: 'Deposits', icon: HiArrowDown, permission: PERMISSIONS.VIEW_DEPOSITS }, { to: '/withdrawals', label: 'Withdrawals', icon: HiArrowUp, permission: PERMISSIONS.VIEW_WITHDRAWALS }, { to: '/transactions', label: 'Transactions', icon: HiCurrencyDollar, permission: PERMISSIONS.VIEW_TRANSACTIONS }] },
-  { key: 'gaming', label: 'GAMING', pill: 'ON', items: [{ to: '/games', label: 'Games', icon: HiCollection, permission: PERMISSIONS.VIEW_GAMES }, { to: '/bonuses', label: 'Bonuses', icon: HiGift, permission: PERMISSIONS.VIEW_BONUSES }, { to: '/referrals', label: 'Referrals', icon: HiUserGroup, permission: PERMISSIONS.VIEW_REFERRALS }] },
+  { key: 'wallets', label: 'WALLETS & MONEY', items: [{ to: '/wallets', label: 'Wallets', icon: HiCash, permission: PERMISSIONS.VIEW_WALLETS }, { to: '/deposits', label: 'Deposits', icon: HiArrowDown, permission: PERMISSIONS.VIEW_DEPOSITS }, { to: '/withdrawals', label: 'Withdrawals', icon: HiArrowUp, permission: PERMISSIONS.VIEW_WITHDRAWALS }, { to: '/transactions', label: 'Transactions', icon: HiCurrencyDollar, permission: PERMISSIONS.VIEW_TRANSACTIONS }, { to: '/account-settlement', label: 'Account Statement', icon: HiDocumentReport, permission: PERMISSIONS.VIEW_ACCOUNT_STATEMENT }] },
+  { key: 'gaming', label: 'GAMING', pill: 'ON', items: [{ to: '/games', label: 'Games', icon: HiCollection, permission: PERMISSIONS.VIEW_GAMES }, { to: '/bets', label: 'Bets', icon: HiTicket, permission: PERMISSIONS.MANAGE_BETTING }, { to: '/bonuses', label: 'Bonuses', icon: HiGift, permission: PERMISSIONS.VIEW_BONUSES }, { to: '/referrals', label: 'Referrals', icon: HiUserGroup, permission: PERMISSIONS.VIEW_REFERRALS }] },
   { key: 'risk', label: 'RISK & REPORTS', items: [{ to: '/risk-fraud', label: 'Risk & Fraud', icon: HiShieldExclamation, permission: PERMISSIONS.VIEW_RISK }, { to: '/reports', label: 'Reports', icon: HiDocumentReport, permission: PERMISSIONS.VIEW_REPORTS }] },
   { key: 'content', label: 'CONTENT & SUPPORT', items: [{ to: '/cms', label: 'CMS', icon: HiDocumentText, permission: PERMISSIONS.VIEW_CMS }, { to: '/support', label: 'Support', icon: HiSupport, permission: PERMISSIONS.VIEW_TICKETS }, { to: '/notifications', label: 'Notifications', icon: HiBell, permission: PERMISSIONS.VIEW_NOTIFICATIONS }] },
 ]
 
 export default function Sidebar() {
   const { sidebarCollapsed, toggleSidebar, sidebarMobileOpen, closeMobileSidebar } = useLayout()
-  const { hasPermission, logout } = useAuth()
+  const { hasPermission, logout, getAssignedUserIds } = useAuth()
   const { addToast } = useToast()
   const navigate = useNavigate()
+  const [pendingDeposits, setPendingDeposits] = useState(0)
+  const [pendingWithdrawals, setPendingWithdrawals] = useState(0)
+  const [pendingTickets, setPendingTickets] = useState(0)
+
+  useEffect(() => {
+    const assignedIds = getAssignedUserIds()
+    getDeposits().then((r) => {
+      let list = r.data || []
+      if (assignedIds?.length) list = list.filter((d) => assignedIds.includes(d.userId))
+      setPendingDeposits(list.filter((d) => d.status === 'pending').length)
+    })
+    getWithdrawals().then((r) => {
+      let list = r.data || []
+      if (assignedIds?.length) list = list.filter((w) => assignedIds.includes(w.userId))
+      setPendingWithdrawals(list.filter((w) => w.status === 'pending').length)
+    })
+    getTickets().then((r) => {
+      const list = r.data || []
+      const open = list.filter((t) => (t.status || '').toLowerCase() === 'open').length
+      setPendingTickets(open)
+    })
+  }, [getAssignedUserIds])
 
   const linkClass = ({ isActive }) =>
     `flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium transition-all duration-200 border-l-4 ${
@@ -108,36 +133,51 @@ export default function Sidebar() {
                 {sidebarCollapsed ? (
                   visibleItems.map((item) => {
                     const Icon = item.icon
+                    const count = item.to === '/deposits' ? pendingDeposits : item.to === '/withdrawals' ? pendingWithdrawals : item.to === '/support' ? pendingTickets : null
+                    const title = count != null && count > 0 ? `${item.label} (${count} pending)` : item.label
                     return (
                       <NavLink
                         key={item.to}
                         to={item.to}
                         end={item.to === '/'}
                         onClick={closeMobileSidebar}
-                        title={item.label}
+                        title={title}
                         className={({ isActive }) =>
-                          `flex items-center justify-center p-2.5 rounded-lg text-sm font-medium transition-all ${
+                          `flex items-center justify-center p-2.5 rounded-lg text-sm font-medium transition-all relative ${
                             isActive ? 'bg-teal-50 text-teal-600 border-l-4 border-l-teal-500' : 'text-gray-500 hover:bg-gray-200 hover:text-gray-700'
                           }`
                         }
                       >
                         <Icon className="w-5 h-5" />
+                        {count != null && count > 0 && (
+                          <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold">
+                            {count > 99 ? '99+' : count}
+                          </span>
+                        )}
                       </NavLink>
                     )
                   })
                 ) : (
-                  visibleItems.map(({ to, label, icon: Icon }) => (
-                    <NavLink
-                      key={to}
-                      to={to}
-                      end={to === '/'}
-                      onClick={closeMobileSidebar}
-                      className={linkClass}
-                    >
-                      <Icon className="w-5 h-5 flex-shrink-0 text-gray-500" />
-                      <span>{label}</span>
-                    </NavLink>
-                  ))
+                  visibleItems.map(({ to, label, icon: Icon }) => {
+                    const count = to === '/deposits' ? pendingDeposits : to === '/withdrawals' ? pendingWithdrawals : to === '/support' ? pendingTickets : null
+                    return (
+                      <NavLink
+                        key={to}
+                        to={to}
+                        end={to === '/'}
+                        onClick={closeMobileSidebar}
+                        className={linkClass}
+                      >
+                        <Icon className="w-5 h-5 flex-shrink-0 text-gray-500" />
+                        <span className="flex-1 min-w-0 truncate">{label}</span>
+                        {count != null && count > 0 && (
+                          <span className="flex-shrink-0 min-w-[22px] h-5 px-1.5 flex items-center justify-center rounded-full bg-amber-500 text-white text-xs font-bold">
+                            {count > 99 ? '99+' : count}
+                          </span>
+                        )}
+                      </NavLink>
+                    )
+                  })
                 )}
               </div>
             )
