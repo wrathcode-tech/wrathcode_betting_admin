@@ -1,8 +1,7 @@
 /**
- * Games – Teal banner, summary cards, Game Library (grid/list), search & category filter.
- * Data from getGames(); add/edit/delete update local state. Easy to understand at a glance.
+ * Games – Game library from GET /api/v1/master/games. Grid/list view, search, filters, pagination.
  */
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   HiOutlinePlus,
   HiSearch,
@@ -14,6 +13,9 @@ import {
   HiUserGroup,
   HiStatusOnline,
   HiTag,
+  HiChevronLeft,
+  HiChevronRight,
+  HiRefresh,
 } from 'react-icons/hi'
 import PageBanner from '../components/PageBanner'
 import Modal from '../components/Modal'
@@ -21,12 +23,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import EmptyState from '../components/EmptyState'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
-import { getGames } from '../services/api'
-
-const CURRENCY = 'INR'
-function formatInr(n) {
-  return `${CURRENCY === 'INR' ? '₹' : ''}${Number(n || 0).toLocaleString('en-IN')}`
-}
+import AuthService from '../api/services/AuthService'
 
 const CATEGORY_STYLES = {
   Card: 'bg-teal-100 text-teal-700',
@@ -34,88 +31,107 @@ const CATEGORY_STYLES = {
   Sports: 'bg-amber-100 text-amber-700',
   Crash: 'bg-rose-100 text-rose-700',
   Live: 'bg-violet-100 text-violet-700',
+  slots: 'bg-indigo-100 text-indigo-700',
+  crash: 'bg-rose-100 text-rose-700',
 }
 
 function getCategoryStyle(cat) {
-  return CATEGORY_STYLES[cat] || 'bg-gray-100 text-gray-700'
+  const c = (cat || '').toLowerCase()
+  return CATEGORY_STYLES[cat] || CATEGORY_STYLES[c] || 'bg-gray-100 text-gray-700'
 }
+
+function getCategoryLabel(game) {
+  const cat = game.category
+  if (Array.isArray(cat) && cat[0]) return cat[0].name || cat[0].code || '–'
+  return cat?.name || cat?.code || cat || '–'
+}
+
+const DEBOUNCE_MS = 400
+const CATEGORY_OPTIONS = ['All', 'slots', 'crash', 'Card', 'Casino', 'Sports', 'Crash', 'Live']
 
 export default function Games() {
   const { user, getSubAdminCapabilities } = useAuth()
   const caps = getSubAdminCapabilities()
   const [games, setGames] = useState([])
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(20)
+  const [searchInput, setSearchInput] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('All')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [sortBy, setSortBy] = useState('')
+  const [sortOrder, setSortOrder] = useState('asc')
+  const [viewMode, setViewMode] = useState('grid')
   const [addOpen, setAddOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const [selectedGame, setSelectedGame] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
-  const [form, setForm] = useState({
-    name: '',
-    provider: 'In-house',
-    category: 'Card',
-    minBet: '',
-    maxBet: '',
-    houseEdge: '',
-    status: 'live',
-  })
-  const [search, setSearch] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('All')
-  const [viewMode, setViewMode] = useState('grid')
   const { addToast } = useToast()
 
+  const fetchGames = useCallback(() => {
+    setLoading(true)
+    setError(null)
+    const params = { page, limit }
+    if (searchTerm.trim()) params.search = searchTerm.trim()
+    if (statusFilter) params.status = statusFilter
+    if (categoryFilter && categoryFilter !== 'All') params.category = categoryFilter
+    if (sortBy) params.sortBy = sortBy
+    if (sortOrder) params.sortOrder = sortOrder
+    AuthService.getMasterGames(params)
+      .then((res) => {
+        if (res?.success && res?.data) {
+          setGames(res.data.games || [])
+          setPagination(res.data.pagination || { page: 1, limit: 20, total: 0, totalPages: 1 })
+          setError(null)
+        } else {
+          setGames([])
+          setPagination({ page: 1, limit: 20, total: 0, totalPages: 1 })
+          setError(res?.message || 'Failed to load games')
+        }
+      })
+      .catch(() => {
+        setGames([])
+        setPagination({ page: 1, limit: 20, total: 0, totalPages: 1 })
+        setError('Failed to load games')
+      })
+      .finally(() => setLoading(false))
+  }, [page, limit, searchTerm, statusFilter, categoryFilter, sortBy, sortOrder])
+
   useEffect(() => {
-    getGames().then((r) => setGames(Array.isArray(r.data) ? r.data : []))
-  }, [])
+    fetchGames()
+  }, [fetchGames])
 
-  const filtered = useMemo(() => {
-    return games.filter((g) => {
-      const matchSearch = !search.trim() || (g.name && g.name.toLowerCase().includes(search.toLowerCase()))
-      const matchCat = categoryFilter === 'All' || (g.category === categoryFilter)
-      return matchSearch && matchCat
-    })
-  }, [games, search, categoryFilter])
+  useEffect(() => {
+    const t = setTimeout(() => setSearchTerm(searchInput), DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [searchInput])
 
-  const categories = useMemo(() => {
-    const set = new Set(games.map((g) => g.category).filter(Boolean))
-    return ['All', ...Array.from(set).sort()]
-  }, [games])
+  useEffect(() => {
+    setPage(1)
+  }, [searchTerm, statusFilter, categoryFilter, sortBy, sortOrder])
 
-  const stats = useMemo(() => {
-    const live = games.filter((g) => (g.status || g.enabled === true) && (g.status !== 'maintenance')).length
-    const catSet = new Set(games.map((g) => g.category).filter(Boolean))
-    const totalPlayers = games.reduce((s, g) => s + (Number(g.activePlayers) || 0), 0)
-    return {
-      total: games.length,
-      live,
-      categories: catSet.size,
-      totalPlayers,
-    }
-  }, [games])
+  const totalPages = Math.max(1, pagination.totalPages)
+  const currentPage = Math.min(page, totalPages)
+  const total = pagination.total
+
+  const stats = {
+    total,
+    live: games.filter((g) => g.status === 'active').length,
+    categories: [...new Set(games.map((g) => getCategoryLabel(g)).filter(Boolean))].length,
+    totalPlayers: games.reduce((s, g) => s + Number(g.playCount || 0), 0),
+  }
 
   function openAdd() {
-    setForm({
-      name: '',
-      provider: 'In-house',
-      category: 'Card',
-      minBet: '',
-      maxBet: '',
-      houseEdge: '',
-      status: 'live',
-    })
-    setAddOpen(true)
+    addToast('Add game API not implemented', 'error')
   }
 
   function openEdit(g) {
     setSelectedGame(g)
-    setForm({
-      name: g.name || '',
-      provider: g.provider || 'In-house',
-      category: g.category || 'Card',
-      minBet: g.minBet != null ? String(g.minBet) : '',
-      maxBet: g.maxBet != null ? String(g.maxBet) : '',
-      houseEdge: g.houseEdge != null ? String(g.houseEdge) : '',
-      status: g.status || (g.enabled === false ? 'maintenance' : 'live'),
-    })
+    addToast('Edit game API not implemented', 'error')
     setEditOpen(true)
   }
 
@@ -124,79 +140,19 @@ export default function Games() {
     setStatsOpen(true)
   }
 
-  function handleAddSubmit(e) {
-    e.preventDefault()
-    if (!form.name.trim()) {
-      addToast('Game name is required', 'error')
-      return
-    }
-    const min = Number(form.minBet) || 0
-    const max = Number(form.maxBet) || 0
-    const edge = Number(form.houseEdge) || 0
-    const newId = Math.max(0, ...games.map((x) => x.id)) + 1
-    setGames((prev) => [
-      ...prev,
-      {
-        id: newId,
-        name: form.name.trim(),
-        provider: form.provider || 'In-house',
-        category: form.category || 'Card',
-        minBet: min,
-        maxBet: max,
-        houseEdge: edge,
-        enabled: form.status === 'live',
-        status: form.status,
-        activePlayers: 0,
-      },
-    ])
-    setAddOpen(false)
-    addToast('Game added successfully', 'success')
-  }
-
-  function handleEditSubmit(e) {
-    e.preventDefault()
-    if (!selectedGame) return
-    const min = Number(form.minBet) || 0
-    const max = Number(form.maxBet) || 0
-    const edge = Number(form.houseEdge) || 0
-    setGames((prev) =>
-      prev.map((g) =>
-        g.id === selectedGame.id
-          ? {
-              ...g,
-              name: form.name.trim(),
-              provider: form.provider || 'In-house',
-              category: form.category || 'Card',
-              minBet: min,
-              maxBet: max,
-              houseEdge: edge,
-              enabled: form.status === 'live',
-              status: form.status,
-            }
-          : g
-      )
-    )
-    setEditOpen(false)
-    setSelectedGame(null)
-    addToast('Game updated successfully', 'success')
-  }
-
   function handleDelete(id) {
-    setGames((prev) => prev.filter((g) => g.id !== id))
+    addToast('Delete game API not implemented', 'error')
     setDeleteConfirm(null)
-    addToast('Game removed', 'success')
   }
 
-  const inputClass =
-    'w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none'
   const btnPrimary =
     'px-4 py-2.5 rounded-xl bg-teal-500 text-white font-semibold hover:bg-teal-600 focus:ring-2 focus:ring-teal-500/50 focus:outline-none transition-colors'
   const btnSecondary =
-    'px-4 py-2.5 rounded-xl bg-gray-200 text-gray-700 hover:bg-gray-300 focus:ring-2 focus:ring-gray-400 focus:outline-none transition-colors'
+    'px-4 py-2.5 rounded-xl bg-gray-200 text-gray-700 hover:bg-gray-300 focus:ring-2 focus:ring-gray-400 focus:outline-none'
 
   return (
     <div className="space-y-0">
-      <PageBanner title="Games" subtitle="Manage your game library — enable, edit limits, and view stats – PlayAdd / BetFury" icon={HiCollection} />
+      <PageBanner title="Games" subtitle="Manage your game library — view and filter games" icon={HiCollection} />
 
       {user?.role === 'sub_admin' && caps.maxGameExposure != null && caps.maxGameExposure > 0 && (
         <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-800">
@@ -213,7 +169,7 @@ export default function Games() {
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Games</p>
-              <p className="text-lg font-bold text-gray-900">{stats.total}</p>
+              <p className="text-lg font-bold text-gray-900">{loading ? '…' : stats.total}</p>
             </div>
           </div>
         </div>
@@ -223,7 +179,7 @@ export default function Games() {
               <HiStatusOnline className="w-5 h-5 text-emerald-600" />
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Live Now</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Active (page)</p>
               <p className="text-lg font-bold text-gray-900">{stats.live}</p>
             </div>
           </div>
@@ -234,7 +190,7 @@ export default function Games() {
               <HiTag className="w-5 h-5 text-indigo-600" />
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Categories</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Categories (page)</p>
               <p className="text-lg font-bold text-gray-900">{stats.categories}</p>
             </div>
           </div>
@@ -245,7 +201,7 @@ export default function Games() {
               <HiUserGroup className="w-5 h-5 text-amber-600" />
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Players</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Play Count (page)</p>
               <p className="text-lg font-bold text-gray-900">{stats.totalPlayers.toLocaleString('en-IN')}</p>
             </div>
           </div>
@@ -263,7 +219,7 @@ export default function Games() {
             <HiOutlinePlus className="w-5 h-5" />
             Add Game
           </button>
-          <span className="text-sm text-gray-500">{filtered.length} games</span>
+          <span className="text-sm text-gray-500">{loading ? '…' : `${total} games`}</span>
         </div>
       </div>
 
@@ -273,22 +229,67 @@ export default function Games() {
           <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search by game name..."
             className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-gray-200 text-gray-900 placeholder-gray-400 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2.5 rounded-xl bg-white border border-gray-200 text-gray-900 text-sm focus:border-teal-500 focus:outline-none"
+          >
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="px-3 py-2.5 rounded-xl bg-white border border-gray-200 text-gray-900 text-sm focus:border-teal-500 focus:outline-none"
           >
-            {categories.map((c) => (
+            {CATEGORY_OPTIONS.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
+          <select
+            value={`${sortBy}-${sortOrder}`}
+            onChange={(e) => {
+              const v = e.target.value
+              if (v) {
+                const [s, o] = v.split('-')
+                setSortBy(s)
+                setSortOrder(o)
+              } else {
+                setSortBy('')
+                setSortOrder('asc')
+              }
+            }}
+            className="px-3 py-2.5 rounded-xl bg-white border border-gray-200 text-gray-900 text-sm focus:border-teal-500 focus:outline-none"
+          >
+            <option value="">Sort</option>
+            <option value="name-asc">Name A–Z</option>
+            <option value="name-desc">Name Z–A</option>
+          </select>
+          <select
+            value={limit}
+            onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+            className="px-3 py-2.5 rounded-xl bg-white border border-gray-200 text-gray-900 text-sm focus:border-teal-500 focus:outline-none"
+          >
+            <option value={10}>10 / page</option>
+            <option value={20}>20 / page</option>
+            <option value={50}>50 / page</option>
+          </select>
+          <button
+            type="button"
+            onClick={fetchGames}
+            className="p-2.5 rounded-xl bg-teal-500 text-white hover:bg-teal-600"
+            title="Refresh"
+          >
+            <HiRefresh className="w-5 h-5" />
+          </button>
           <div className="flex rounded-xl overflow-hidden border border-gray-200">
             <button
               type="button"
@@ -310,55 +311,61 @@ export default function Games() {
         </div>
       </div>
 
-      {viewMode === 'grid' ? (
+      {loading ? (
+        <div className="py-12 text-center text-gray-500 text-sm">Loading games…</div>
+      ) : error ? (
+        <div className="py-12 text-center text-red-600 text-sm">{error}</div>
+      ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((g) => (
+          {games.map((g) => (
             <div
-              key={g.id}
-              className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-teal-200 transition-all duration-200"
+              key={g._id}
+              className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:border-teal-200 transition-all duration-200"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 truncate">{g.name}</h3>
-                  <p className="text-gray-500 text-sm mt-0.5">{g.provider}</p>
-                  <div className="flex flex-wrap items-center gap-2 mt-2">
-                    <span className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-medium ${getCategoryStyle(g.category)}`}>
-                      {g.category}
-                    </span>
-                    <span
-                      className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-medium ${
-                        (g.status === 'live' || g.enabled === true) && g.status !== 'maintenance'
-                          ? 'bg-emerald-500/20 text-emerald-600'
-                          : 'bg-amber-100 text-amber-700'
-                      }`}
-                    >
-                      {(g.status === 'live' || g.enabled === true) && g.status !== 'maintenance' ? 'Live' : 'Maintenance'}
-                    </span>
+              {g.thumbnail && (
+                <div className="aspect-video bg-gray-100">
+                  <img src={g.thumbnail} alt="" className="w-full h-full object-cover" />
+                </div>
+              )}
+              <div className="p-5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 truncate">{g.name}</h3>
+                    <p className="text-gray-500 text-sm mt-0.5">{g.providerName || g.providerCode || '–'}</p>
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <span className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-medium ${getCategoryStyle(getCategoryLabel(g))}`}>
+                        {getCategoryLabel(g)}
+                      </span>
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-medium ${
+                          g.status === 'active' ? 'bg-emerald-500/20 text-emerald-600' : 'bg-amber-100 text-amber-700'
+                        }`}
+                      >
+                        {g.status === 'active' ? 'Active' : g.status || '–'}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="mt-4 space-y-1 text-sm text-gray-600">
-                <p>Bet: {formatInr(g.minBet)} – {formatInr(g.maxBet)}</p>
-                <p className="flex items-center gap-1">
+                <div className="mt-4 flex items-center gap-1 text-sm text-gray-600">
                   <HiUserGroup className="w-4 h-4 text-gray-400" />
-                  {(g.activePlayers ?? 0).toLocaleString('en-IN')} playing
-                </p>
-              </div>
-              <div className="mt-4 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => openEdit(g)}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <HiPencil className="w-4 h-4" /> Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openStats(g)}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-teal-200 text-teal-600 hover:bg-teal-50 flex items-center justify-center gap-1.5 transition-colors"
-                >
-                  <HiChartBar className="w-4 h-4" /> Stats
-                </button>
+                  {(g.playCount ?? 0).toLocaleString('en-IN')} plays
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openEdit(g)}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center justify-center gap-1.5"
+                  >
+                    <HiPencil className="w-4 h-4" /> Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openStats(g)}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-teal-200 text-teal-600 hover:bg-teal-50 flex items-center justify-center gap-1.5"
+                  >
+                    <HiChartBar className="w-4 h-4" /> Stats
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -371,35 +378,36 @@ export default function Games() {
                 <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Game</th>
                 <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Provider</th>
                 <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Category</th>
-                <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Bet range</th>
-                <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Players</th>
+                <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Play Count</th>
                 <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Status</th>
                 <th className="text-right py-4 px-5 text-gray-600 font-semibold text-sm">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((g) => (
-                <tr key={g.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-4 px-5 text-gray-900 font-medium">{g.name}</td>
-                  <td className="py-4 px-5 text-gray-500">{g.provider}</td>
+              {games.map((g) => (
+                <tr key={g._id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-4 px-5">
-                    <span className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-medium ${getCategoryStyle(g.category)}`}>
-                      {g.category}
+                    <div className="flex items-center gap-3">
+                      {g.thumbnail && (
+                        <img src={g.thumbnail} alt="" className="w-10 h-10 rounded-lg object-cover bg-gray-100" />
+                      )}
+                      <span className="font-medium text-gray-900">{g.name}</span>
+                    </div>
+                  </td>
+                  <td className="py-4 px-5 text-gray-500">{g.providerName || g.providerCode || '–'}</td>
+                  <td className="py-4 px-5">
+                    <span className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-medium ${getCategoryStyle(getCategoryLabel(g))}`}>
+                      {getCategoryLabel(g)}
                     </span>
                   </td>
-                  <td className="py-4 px-5 text-gray-600 text-sm">
-                    {formatInr(g.minBet)} – {formatInr(g.maxBet)}
-                  </td>
-                  <td className="py-4 px-5 text-gray-600">{(g.activePlayers ?? 0).toLocaleString('en-IN')}</td>
+                  <td className="py-4 px-5 text-gray-600">{(g.playCount ?? 0).toLocaleString('en-IN')}</td>
                   <td className="py-4 px-5">
                     <span
                       className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-medium ${
-                        (g.status === 'live' || g.enabled === true) && g.status !== 'maintenance'
-                          ? 'bg-emerald-500/20 text-emerald-600'
-                          : 'bg-amber-100 text-amber-700'
+                        g.status === 'active' ? 'bg-emerald-500/20 text-emerald-600' : 'bg-amber-100 text-amber-700'
                       }`}
                     >
-                      {(g.status === 'live' || g.enabled === true) && g.status !== 'maintenance' ? 'Live' : 'Maintenance'}
+                      {g.status === 'active' ? 'Active' : g.status || '–'}
                     </span>
                   </td>
                   <td className="py-4 px-5 text-right">
@@ -412,7 +420,7 @@ export default function Games() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setDeleteConfirm({ id: g.id, name: g.name })}
+                        onClick={() => setDeleteConfirm({ id: g._id, name: g.name })}
                         className="p-2 rounded-lg text-red-400 hover:bg-red-500/10"
                         title="Delete"
                       >
@@ -427,146 +435,44 @@ export default function Games() {
         </div>
       )}
 
-      {filtered.length === 0 && (
+      {!loading && !error && totalPages > 1 && (
+        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
+          <p className="text-sm text-gray-500">
+            Page {currentPage} of {totalPages} ({total} total)
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage <= 1}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none inline-flex items-center gap-1"
+            >
+              <HiChevronLeft className="w-4 h-4" /> Prev
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage >= totalPages}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none inline-flex items-center gap-1"
+            >
+              Next <HiChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!loading && !error && games.length === 0 && (
         <EmptyState
           title="No games found"
-          message={games.length === 0 ? 'Add your first game to get started.' : 'Try changing search or category filter.'}
-          action={games.length === 0 ? <button type="button" onClick={openAdd} className={btnPrimary}>Add Game</button> : undefined}
+          message={searchTerm || statusFilter || categoryFilter !== 'All' ? 'Try changing search or filters.' : 'No games to display.'}
+          action={<button type="button" onClick={() => { setSearchInput(''); setStatusFilter(''); setCategoryFilter('All'); setPage(1); }} className={btnSecondary}>Clear filters</button>}
         />
       )}
 
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add Game">
-        <form onSubmit={handleAddSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Game Name</label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className={inputClass}
-              placeholder="e.g. Teen Patti"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Provider</label>
-            <input
-              type="text"
-              value={form.provider}
-              onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value }))}
-              className={inputClass}
-              placeholder="In-house"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
-            <select
-              value={form.category}
-              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-              className={inputClass}
-            >
-              <option value="Card">Card</option>
-              <option value="Casino">Casino</option>
-              <option value="Sports">Sports</option>
-              <option value="Crash">Crash</option>
-              <option value="Live">Live</option>
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Min bet (₹)</label>
-              <input
-                type="number"
-                min="0"
-                value={form.minBet}
-                onChange={(e) => setForm((f) => ({ ...f, minBet: e.target.value }))}
-                className={inputClass}
-                placeholder="10"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Max bet (₹)</label>
-              <input
-                type="number"
-                min="0"
-                value={form.maxBet}
-                onChange={(e) => setForm((f) => ({ ...f, maxBet: e.target.value }))}
-                className={inputClass}
-                placeholder="50000"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">House edge (%)</label>
-            <input
-              type="number"
-              step="0.1"
-              min="0"
-              value={form.houseEdge}
-              onChange={(e) => setForm((f) => ({ ...f, houseEdge: e.target.value }))}
-              className={inputClass}
-              placeholder="2.5"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
-            <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} className={inputClass}>
-              <option value="live">Live</option>
-              <option value="maintenance">Maintenance</option>
-            </select>
-          </div>
-          <div className="flex gap-2 pt-2">
-            <button type="submit" className={btnPrimary}>Add Game</button>
-            <button type="button" onClick={() => setAddOpen(false)} className={btnSecondary}>Cancel</button>
-          </div>
-        </form>
-      </Modal>
-
       <Modal open={editOpen} onClose={() => { setEditOpen(false); setSelectedGame(null); }} title="Edit Game">
-        <form onSubmit={handleEditSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Game Name</label>
-            <input type="text" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className={inputClass} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Provider</label>
-            <input type="text" value={form.provider} onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value }))} className={inputClass} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
-            <select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} className={inputClass}>
-              <option value="Card">Card</option>
-              <option value="Casino">Casino</option>
-              <option value="Sports">Sports</option>
-              <option value="Crash">Crash</option>
-              <option value="Live">Live</option>
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Min bet (₹)</label>
-              <input type="number" min="0" value={form.minBet} onChange={(e) => setForm((f) => ({ ...f, minBet: e.target.value }))} className={inputClass} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Max bet (₹)</label>
-              <input type="number" min="0" value={form.maxBet} onChange={(e) => setForm((f) => ({ ...f, maxBet: e.target.value }))} className={inputClass} />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">House edge (%)</label>
-            <input type="number" step="0.1" min="0" value={form.houseEdge} onChange={(e) => setForm((f) => ({ ...f, houseEdge: e.target.value }))} className={inputClass} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
-            <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} className={inputClass}>
-              <option value="live">Live</option>
-              <option value="maintenance">Maintenance</option>
-            </select>
-          </div>
-          <div className="flex gap-2 pt-2">
-            <button type="submit" className={btnPrimary}>Save</button>
-            <button type="button" onClick={() => { setEditOpen(false); setSelectedGame(null); }} className={btnSecondary}>Cancel</button>
-          </div>
-        </form>
+        {selectedGame && (
+          <p className="text-gray-500 text-sm">Edit game API not implemented. Game: {selectedGame.name}</p>
+        )}
       </Modal>
 
       <Modal open={statsOpen} onClose={() => { setStatsOpen(false); setSelectedGame(null); }} title={selectedGame ? `${selectedGame.name} – Stats` : 'Game Stats'} size="md">
@@ -574,23 +480,20 @@ export default function Games() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
-                <p className="text-xs text-gray-500">Total Plays</p>
-                <p className="text-lg font-semibold text-gray-900 mt-0.5">12,847</p>
+                <p className="text-xs text-gray-500">Play Count</p>
+                <p className="text-lg font-semibold text-gray-900 mt-0.5">{(selectedGame.playCount ?? 0).toLocaleString('en-IN')}</p>
               </div>
               <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
-                <p className="text-xs text-gray-400">Active Players</p>
-                <p className="text-lg font-semibold text-gray-900 mt-0.5">{(selectedGame.activePlayers ?? 0).toLocaleString('en-IN')}</p>
+                <p className="text-xs text-gray-400">Status</p>
+                <p className="text-lg font-semibold text-gray-900 mt-0.5">{selectedGame.status || '–'}</p>
               </div>
               <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
-                <p className="text-xs text-gray-400">Revenue (7d)</p>
-                <p className="text-lg font-semibold text-emerald-600 mt-0.5">₹48,291</p>
-              </div>
-              <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
-                <p className="text-xs text-gray-400">RTP</p>
-                <p className="text-lg font-semibold text-teal-600 mt-0.5">{selectedGame.houseEdge != null ? `${100 - Number(selectedGame.houseEdge)}%` : '—'}</p>
+                <p className="text-xs text-gray-400">Last Synced</p>
+                <p className="text-sm font-semibold text-gray-900 mt-0.5">
+                  {selectedGame.lastSyncedAt ? new Date(selectedGame.lastSyncedAt).toLocaleString() : '–'}
+                </p>
               </div>
             </div>
-            <p className="text-sm text-gray-500">Last 7 days • Demo data</p>
           </div>
         )}
       </Modal>
@@ -598,7 +501,7 @@ export default function Games() {
       <ConfirmDialog
         open={!!deleteConfirm}
         title="Delete game?"
-        message={deleteConfirm ? `Remove "${deleteConfirm.name}"?` : ''}
+        message={deleteConfirm ? `Remove "${deleteConfirm.name}"? (API not implemented)` : ''}
         confirmLabel="Delete"
         danger
         onConfirm={() => deleteConfirm && handleDelete(deleteConfirm.id)}

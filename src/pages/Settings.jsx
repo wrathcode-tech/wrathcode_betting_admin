@@ -19,8 +19,44 @@ import PageBanner from '../components/PageBanner'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
 import { PERMISSIONS } from '../constants/roles'
+import AuthService from '../api/services/AuthService'
 
 const STORAGE_KEY = 'crownbet-admin-settings'
+
+/** API settings keys → form.serviceControls keys */
+const API_TO_FORM = {
+  gamingBettingEnabled: 'games',
+  depositEnabled: 'deposits',
+  withdrawalEnabled: 'withdrawals',
+  bonusesEnabled: 'bonuses',
+  referralsEnabled: 'referrals',
+  supportEnabled: 'support',
+}
+const FORM_TO_API = {
+  games: 'gamingBettingEnabled',
+  deposits: 'depositEnabled',
+  withdrawals: 'withdrawalEnabled',
+  bonuses: 'bonusesEnabled',
+  referrals: 'referralsEnabled',
+  support: 'supportEnabled',
+}
+
+function apiSettingsToForm(settings) {
+  if (!settings || typeof settings !== 'object') return defaultSettings.serviceControls
+  const out = { ...defaultSettings.serviceControls }
+  Object.entries(API_TO_FORM).forEach(([apiKey, formKey]) => {
+    if (settings[apiKey] !== undefined) out[formKey] = !!settings[apiKey]
+  })
+  return out
+}
+
+function formServiceControlsToApi(serviceControls) {
+  const out = {}
+  Object.entries(FORM_TO_API).forEach(([formKey, apiKey]) => {
+    out[apiKey] = !!serviceControls?.[formKey]
+  })
+  return out
+}
 
 const defaultSettings = {
   siteName: 'Crownbet',
@@ -62,6 +98,9 @@ export default function Settings() {
   const [scheduleFeature, setScheduleFeature] = useState('')
   const [scheduleAction, setScheduleAction] = useState('')
   const [scheduleDateTime, setScheduleDateTime] = useState('')
+  const [siteSettingsLoading, setSiteSettingsLoading] = useState(true)
+  const [siteSettingsError, setSiteSettingsError] = useState(null)
+  const [saving, setSaving] = useState(false)
   const { addToast } = useToast()
   const { hasPermission } = useAuth()
   const canEdit = hasPermission(PERMISSIONS.EDIT_SETTINGS)
@@ -83,14 +122,43 @@ export default function Settings() {
     } catch (_) {}
   }, [])
 
+  useEffect(() => {
+    setSiteSettingsLoading(true)
+    setSiteSettingsError(null)
+    AuthService.getMasterSiteSettings()
+      .then((res) => {
+        if (res?.success && res?.data?.settings) {
+          setForm((f) => ({
+            ...f,
+            serviceControls: apiSettingsToForm(res.data.settings),
+          }))
+          setSiteSettingsError(null)
+        } else {
+          setSiteSettingsError(res?.message || 'Failed to load site settings')
+        }
+      })
+      .catch(() => setSiteSettingsError('Failed to load site settings'))
+      .finally(() => setSiteSettingsLoading(false))
+  }, [])
+
   function handleSave(e) {
     e.preventDefault()
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(form))
-      addToast('Configuration saved successfully', 'success')
-    } catch (_) {
-      addToast('Failed to save settings', 'error')
-    }
+    if (!canEdit) return
+    setSaving(true)
+    const payload = formServiceControlsToApi(form.serviceControls)
+    AuthService.patchMasterSiteSettings(payload)
+      .then((res) => {
+        if (res?.success) {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(form))
+          } catch (_) {}
+          addToast('Configuration saved successfully', 'success')
+        } else {
+          addToast(res?.message || 'Failed to save settings', 'error')
+        }
+      })
+      .catch(() => addToast('Failed to save settings', 'error'))
+      .finally(() => setSaving(false))
   }
 
   function toggleService(key) {
@@ -149,49 +217,57 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Service Controls (Instant On/Off) card */}
+        {/* Service Controls (Instant On/Off) card – GET/PATCH /api/v1/master/site-settings */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">Service Controls (Instant On/Off)</h2>
-          <p className="text-sm text-gray-500 mt-0.5 mb-6">Enable or disable individual services. Click Save to apply changes.</p>
-          <ul className="space-y-4">
-            {SERVICE_CONTROLS.map(({ key, label, description, icon: Icon }) => (
-              <li key={key} className="flex items-center gap-4 py-3 border-b border-gray-100 last:border-0">
-                <div className="w-10 h-10 rounded-lg bg-teal-500/10 flex items-center justify-center flex-shrink-0 text-teal-600">
-                  <Icon className="w-5 h-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900">{label}</p>
-                  <p className="text-sm text-gray-500">{description}</p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={form.serviceControls?.[key]}
-                  onClick={() => toggleService(key)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:cursor-not-allowed ${
-                    form.serviceControls?.[key] ? 'bg-teal-500' : 'bg-gray-200'
-                  } ${!canEdit ? 'opacity-60' : ''}`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
-                      form.serviceControls?.[key] ? 'translate-x-5' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-              </li>
-            ))}
-          </ul>
+          <p className="text-sm text-gray-500 mt-0.5 mb-2">Enable or disable platform functions. Click Save to apply changes.</p>
+          {siteSettingsError && (
+            <p className="text-sm text-red-600 mb-4">{siteSettingsError}</p>
+          )}
+          {siteSettingsLoading ? (
+            <p className="text-sm text-gray-500 py-4">Loading site settings…</p>
+          ) : (
+            <ul className="space-y-4">
+              {SERVICE_CONTROLS.map(({ key, label, description, icon: Icon }) => (
+                <li key={key} className="flex items-center gap-4 py-3 border-b border-gray-100 last:border-0">
+                  <div className="w-10 h-10 rounded-lg bg-teal-500/10 flex items-center justify-center flex-shrink-0 text-teal-600">
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900">{label}</p>
+                    <p className="text-sm text-gray-500">{description}</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={form.serviceControls?.[key]}
+                    onClick={() => toggleService(key)}
+                    disabled={!canEdit}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:cursor-not-allowed ${
+                      form.serviceControls?.[key] ? 'bg-teal-500' : 'bg-gray-200'
+                    } ${!canEdit ? 'opacity-60' : ''}`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
+                        form.serviceControls?.[key] ? 'translate-x-5' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Save Configuration button */}
         <div className="flex justify-center">
           <button
             type="submit"
-            disabled={!canEdit}
+            disabled={!canEdit || siteSettingsLoading || saving}
             className="flex items-center justify-center gap-2 w-full max-w-md px-6 py-3.5 rounded-xl bg-teal-500 text-white font-semibold hover:bg-teal-600 focus:ring-2 focus:ring-teal-500/50 focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <HiSave className="w-5 h-5" />
-            Save Configuration
+            {saving ? 'Saving…' : 'Save Configuration'}
           </button>
         </div>
         {!canEdit && (

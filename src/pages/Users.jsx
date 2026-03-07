@@ -1,8 +1,9 @@
 /**
- * User List – table (EMAIL, MOBILE, NAME, UUID, STATUS, REFERRAL CODE, CREATED, ACTIONS). No KYC.
+ * User List – table (EMAIL, MOBILE, NAME, UUID, STATUS, REFERRAL CODE, CREATED, ACTIONS).
+ * Data from GET /api/v1/master/users with pagination and filters.
  */
-import { useState, useMemo, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   HiUser,
   HiUserGroup,
@@ -19,7 +20,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
 import { PERMISSIONS } from '../constants/roles'
-import { getUsers, updateUser, freezeUser, banUser } from '../services/api'
+import AuthService from '../api/services/AuthService'
 
 function formatCreatedAt(iso) {
   if (!iso) return '–'
@@ -36,93 +37,103 @@ function formatCreatedAt(iso) {
 
 const statusVariant = (s) => (s === 'active' ? 'success' : s === 'banned' ? 'error' : s === 'pending' ? 'warning' : 'neutral')
 
+/** Normalize API user to include id and status for table/actions */
+function normalizeUser(u) {
+  if (!u) return u
+  return {
+    ...u,
+    id: u._id ?? u.id,
+    name: u.fullName ?? u.name,
+    phone: u.mobile ? (u.countryCode ? `${u.countryCode} ${u.mobile}` : u.mobile) : undefined,
+    status: u.accountStatus ?? u.status,
+  }
+}
+
+const DEBOUNCE_MS = 400
+
 export default function Users() {
   const [users, setUsers] = useState([])
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 })
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [searchInput, setSearchInput] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [perPage, setPerPage] = useState(20)
   const [page, setPage] = useState(1)
   const [confirmAction, setConfirmAction] = useState(null)
   const { addToast } = useToast()
-  const { hasPermission, getAssignedUserIds, getSubAdminCapabilities } = useAuth()
+  const { hasPermission, getSubAdminCapabilities } = useAuth()
   const caps = getSubAdminCapabilities()
   const canManageUserAccounts = hasPermission(PERMISSIONS.EDIT_USERS) || caps.canManageUserAccounts
   const navigate = useNavigate()
 
-  useEffect(() => {
-    getUsers().then((r) => {
-      let list = r.data || []
-      const assignedIds = getAssignedUserIds()
-      if (assignedIds && assignedIds.length > 0) list = list.filter((u) => assignedIds.includes(u.id))
-      setUsers(list)
-    })
-  }, [getAssignedUserIds])
-
-  const filteredData = useMemo(() => {
-    let list = [...users]
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase()
-      list = list.filter(
-        (u) =>
-          (u.email && u.email.toLowerCase().includes(term)) ||
-          (u.uuid && String(u.uuid).toLowerCase().includes(term)) ||
-          (u.phone && u.phone.toLowerCase().includes(term)) ||
-          (u.name && u.name.toLowerCase().includes(term)) ||
-          (u.referralCode && u.referralCode.toLowerCase().includes(term))
-      )
+  const fetchUsers = useCallback(() => {
+    setLoading(true)
+    const params = {
+      page,
+      limit: perPage,
+      search: searchTerm.trim() || undefined,
+      accountStatus: statusFilter === 'all' ? undefined : statusFilter,
+      isActive: statusFilter === 'active' ? true : undefined,
     }
-    if (statusFilter !== 'all') list = list.filter((u) => u.status === statusFilter)
-    return list
-  }, [users, searchTerm, statusFilter])
+    AuthService.getMasterUsers(params)
+      .then((res) => {
+        if (res?.success && res?.data) {
+          const list = (res.data.users || []).map(normalizeUser)
+          setUsers(list)
+          setPagination(res.data.pagination || { page: 1, limit: perPage, total: 0, totalPages: 1 })
+        } else {
+          setUsers([])
+          addToast(res?.message || 'Failed to load users', 'error')
+        }
+      })
+      .catch(() => {
+        setUsers([])
+        addToast('Failed to load users', 'error')
+      })
+      .finally(() => setLoading(false))
+  }, [page, perPage, searchTerm, statusFilter, addToast])
 
-  const total = filteredData.length
-  const totalPages = Math.max(1, Math.ceil(total / perPage))
+  useEffect(() => {
+    fetchUsers()
+  }, [fetchUsers])
+
+  useEffect(() => {
+    const t = setTimeout(() => setSearchTerm(searchInput), DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [searchInput])
+
+  const total = pagination.total
+  const totalPages = Math.max(1, pagination.totalPages)
   const currentPage = Math.min(page, totalPages)
-  const slice = useMemo(() => {
-    const start = (currentPage - 1) * perPage
-    return filteredData.slice(start, start + perPage)
-  }, [filteredData, currentPage, perPage])
 
   const goToUser = (user) => navigate(`/users/${user.id}`)
 
   const handleFreeze = () => {
     if (!confirmAction) return
-    freezeUser(confirmAction.id).then(() => {
-      setUsers((prev) => prev.map((u) => (u.id === confirmAction.id ? { ...u, status: 'frozen' } : u)))
-      setConfirmAction(null)
-      addToast('User frozen', 'success')
-    })
+    setConfirmAction(null)
+    addToast('Freeze user API not implemented', 'error')
   }
 
   const handleBan = () => {
     if (!confirmAction) return
-    banUser(confirmAction.id).then(() => {
-      setUsers((prev) => prev.map((u) => (u.id === confirmAction.id ? { ...u, status: 'banned' } : u)))
-      setConfirmAction(null)
-      addToast('User banned', 'success')
-    })
+    setConfirmAction(null)
+    addToast('Ban user API not implemented', 'error')
   }
 
   const handleActivate = () => {
     if (!confirmAction) return
-    updateUser(confirmAction.id, { status: 'active' }).then(() => {
-      setUsers((prev) => prev.map((u) => (u.id === confirmAction.id ? { ...u, status: 'active' } : u)))
-      setConfirmAction(null)
-      addToast('User activated', 'success')
-    })
+    setConfirmAction(null)
+    addToast('Activate user API not implemented', 'error')
   }
 
   const handleRefresh = () => {
-    getUsers().then((r) => {
-      let list = r.data || []
-      const assignedIds = getAssignedUserIds()
-      if (assignedIds && assignedIds.length > 0) list = list.filter((u) => assignedIds.includes(u.id))
-      setUsers(list)
-    })
+    fetchUsers()
     addToast('List refreshed', 'success')
   }
 
   const handleReset = () => {
+    setSearchInput('')
     setSearchTerm('')
     setStatusFilter('all')
     setPage(1)
@@ -138,7 +149,7 @@ export default function Users() {
           <HiUserGroup className="w-5 h-5 text-teal-600" />
           <span className="font-semibold text-gray-800">User List</span>
         </div>
-        <div className="text-sm text-gray-500">{total} Total</div>
+        <div className="text-sm text-gray-500">{loading ? '…' : `${total} Total`}</div>
       </div>
 
       {/* Search + filters */}
@@ -147,9 +158,9 @@ export default function Users() {
           <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="search"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search email, UUID, mobile, name, referral..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search email, UUID, mobile, name..."
             className="w-full pl-9 pr-4 py-2 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none"
           />
         </div>
@@ -207,56 +218,64 @@ export default function Users() {
               </tr>
             </thead>
             <tbody>
-              {slice.map((u) => (
-                <tr
-                  key={u.id}
-                  className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                  onClick={() => goToUser(u)}
-                >
-                  <td className="py-3 px-4 text-gray-900 text-sm">{u.email}</td>
-                  <td className="py-3 px-4 text-gray-600 text-sm">{u.phone || '–'}</td>
-                  <td className="py-3 px-4 text-gray-900 text-sm">{u.name || '–'}</td>
-                  <td className="py-3 px-4">
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); goToUser(u); }}
-                      className="text-teal-600 hover:text-teal-700 font-medium text-sm underline focus:outline-none"
-                    >
-                      {u.uuid || u.id}
-                    </button>
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-gray-500">
+                    Loading users…
                   </td>
-                  <td className="py-3 px-4">
-                    <Badge variant={statusVariant(u.status)}>{u.status === 'active' ? 'Active' : u.status === 'pending' ? 'Pending' : u.status}</Badge>
-                  </td>
-                  <td className="py-3 px-4 text-gray-600 text-sm font-mono">{u.referralCode || '–'}</td>
-                  <td className="py-3 px-4 text-gray-500 text-sm">{formatCreatedAt(u.createdAt)}</td>
-                  <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-end gap-1">
+                </tr>
+              ) : (
+                users.map((u) => (
+                  <tr
+                    key={u.id}
+                    className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                    onClick={() => goToUser(u)}
+                  >
+                    <td className="py-3 px-4 text-gray-900 text-sm">{u.email || '–'}</td>
+                    <td className="py-3 px-4 text-gray-600 text-sm">{u.phone || u.mobile || '–'}</td>
+                    <td className="py-3 px-4 text-gray-900 text-sm">{u.name || u.fullName || '–'}</td>
+                    <td className="py-3 px-4">
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); goToUser(u); }}
-                        className="p-2 rounded-lg text-teal-600 hover:bg-teal-50 transition-colors"
-                        title="View"
+                        className="text-teal-600 hover:text-teal-700 font-medium text-sm underline focus:outline-none"
                       >
-                        <HiEye className="w-5 h-5" />
+                        {u.uuid || u.id}
                       </button>
-                      {canManageUserAccounts && (
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge variant={statusVariant(u.status)}>{u.status === 'active' ? 'Active' : u.status === 'pending' ? 'Pending' : u.status || '–'}</Badge>
+                    </td>
+                    <td className="py-3 px-4 text-gray-600 text-sm font-mono">{u.referralCode || '–'}</td>
+                    <td className="py-3 px-4 text-gray-500 text-sm">{formatCreatedAt(u.createdAt)}</td>
+                    <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
                         <button
                           type="button"
-                          onClick={() => {
-                            if (u.status === 'active') setConfirmAction({ id: u.id, action: 'freeze', name: u.name })
-                            else setConfirmAction({ id: u.id, action: 'activate', name: u.name })
-                          }}
+                          onClick={(e) => { e.stopPropagation(); goToUser(u); }}
                           className="p-2 rounded-lg text-teal-600 hover:bg-teal-50 transition-colors"
-                          title={u.status === 'active' ? 'Lock / Freeze' : 'Activate'}
+                          title="View"
                         >
-                          <HiLockClosed className="w-5 h-5" />
+                          <HiEye className="w-5 h-5" />
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {canManageUserAccounts && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (u.status === 'active') setConfirmAction({ id: u.id, action: 'freeze', name: u.name || u.fullName })
+                              else setConfirmAction({ id: u.id, action: 'activate', name: u.name || u.fullName })
+                            }}
+                            className="p-2 rounded-lg text-teal-600 hover:bg-teal-50 transition-colors"
+                            title={u.status === 'active' ? 'Lock / Freeze' : 'Activate'}
+                          >
+                            <HiLockClosed className="w-5 h-5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

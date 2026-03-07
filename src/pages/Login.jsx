@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { HiMail, HiLockClosed } from 'react-icons/hi'
+import { HiMail, HiLockClosed, HiEye, HiEyeOff } from 'react-icons/hi'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { ROLES } from '../constants/roles'
+import AuthService from '../api/services/AuthService'
 
 const DEMO_ROLES = [
   { role: ROLES.SUPER_ADMIN, name: 'Master Admin (Super Admin)', email: 'admin@crownbet.com' },
@@ -28,6 +29,7 @@ function loadSubAdmins(storageKey) {
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [remember, setRemember] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [demoRole, setDemoRole] = useState(ROLES.SUPER_ADMIN)
@@ -49,7 +51,7 @@ export default function Login() {
     if (demoRole !== ROLES.SUB_ADMIN) setSelectedSubAdminId('')
   }, [demoRole])
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
     if (demoRole === ROLES.SUB_ADMIN) {
       const subAdmin = activeSubAdmins.find((a) => String(a.id) === String(selectedSubAdminId))
@@ -83,18 +85,21 @@ export default function Login() {
       return
     }
     setSubmitting(true)
-    const valid = (email.trim().toLowerCase() === 'admin@crownbet.com' && password === 'admin123') || (email.trim() && password.length >= 4)
-    const demoUser = DEMO_ROLES.find((r) => r.role === demoRole) || DEMO_ROLES[0]
-    setTimeout(() => {
+    try {
+      const res = await AuthService.masterLogin(email.trim(), password)
       setSubmitting(false)
-      if (valid) {
-        login('ok', { id: 1, email: demoUser.email, name: demoUser.name, role: demoUser.role })
-        addToast(`Welcome back as ${demoUser.name}!`, 'success')
+      if (res?.success && res?.data?.accessToken && res?.data?.admin) {
+        const { accessToken, admin } = res.data
+        login(accessToken, admin)
+        addToast(res.message || `Welcome, ${admin.fullName || admin.email}!`, 'success')
         navigate(from, { replace: true })
       } else {
-        addToast('Invalid email or password', 'error')
+        addToast(res?.message || 'Invalid email or password', 'error')
       }
-    }, 400)
+    } catch (err) {
+      setSubmitting(false)
+      addToast(err?.message || 'Login failed. Please try again.', 'error')
+    }
   }
 
   return (
@@ -119,7 +124,7 @@ export default function Login() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@crownbet.com"
+                  placeholder="admin@example.com"
                   autoComplete="email"
                   className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none transition-colors"
                 />
@@ -131,27 +136,36 @@ export default function Login() {
                 <HiLockClosed className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   id="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   autoComplete="current-password"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none transition-colors"
+                  className="w-full pl-10 pr-11 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none transition-colors"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((p) => !p)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 focus:outline-none focus:text-teal-500"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <HiEyeOff className="w-5 h-5" /> : <HiEye className="w-5 h-5" />}
+                </button>
               </div>
             </div>
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="rounded border-gray-300 bg-gray-50 text-teal-500 focus:ring-teal-500" />
               <span className="text-gray-600 text-sm">Remember me</span>
             </label>
-            <div>
+            {/* <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Demo: login as</label>
               <select value={demoRole} onChange={(e) => setDemoRole(e.target.value)} className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:outline-none text-sm">
                 {DEMO_ROLES.map((r) => (
                   <option key={r.role} value={r.role}>{r.name}</option>
                 ))}
               </select>
-            </div>
+            </div> */}
             {demoRole === ROLES.SUB_ADMIN && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Sub Admin account</label>
@@ -182,9 +196,7 @@ export default function Login() {
           </button>
         </form>
 
-        <p className="text-center text-gray-500 text-xs mt-6">
-          Demo: admin@crownbet.com / admin123
-        </p>
+        
       </div>
     </div>
   )

@@ -3,12 +3,25 @@ import { getPermissionsForRole, getPermissionsForRoles } from '../constants/role
 
 const AUTH_KEY = 'casino_admin_auth'
 const SUB_ADMINS_KEY = 'casino_sub_admins'
+const TOKEN_KEY = 'token'
 
 const defaultUser = {
   id: 1,
   email: 'admin@crownbet.com',
   name: 'Admin User',
   role: 'super_admin',
+}
+
+/** Map API admin shape { _id, fullName, email, isActive, ... } to app shape { id, name, email, role, ... } */
+function normalizeAdmin(apiAdmin) {
+  if (!apiAdmin) return null
+  return {
+    id: apiAdmin._id ?? apiAdmin.id,
+    email: apiAdmin.email ?? '',
+    name: apiAdmin.fullName ?? apiAdmin.name ?? apiAdmin.email ?? 'Admin',
+    role: apiAdmin.role || 'super_admin',
+    ...apiAdmin,
+  }
 }
 
 const AuthContext = createContext(null)
@@ -65,24 +78,33 @@ export function AuthProvider({ children }) {
       const stored = localStorage.getItem(AUTH_KEY)
       if (stored) {
         const parsed = JSON.parse(stored)
-        setUser(parsed.user || { ...defaultUser, ...parsed })
+        const userData = parsed.user || { ...defaultUser, ...parsed }
+        setUser(userData)
+        const accessToken = parsed.accessToken ?? parsed.token
+        if (accessToken) sessionStorage.setItem(TOKEN_KEY, accessToken)
       } else {
         setUser(null)
+        sessionStorage.removeItem(TOKEN_KEY)
       }
     } catch (_) {
       setUser(null)
+      sessionStorage.removeItem(TOKEN_KEY)
     }
     setLoading(false)
   }, [])
 
-  function login(token = 'ok', loginUser = null) {
-    const u = loginUser || defaultUser
+  /** login(accessToken, adminUser, refreshToken?) – after master login API; syncs token to sessionStorage for API calls */
+  function login(accessToken = 'ok', loginUser = null, refreshToken = null) {
+    const u = loginUser ? normalizeAdmin(loginUser) : defaultUser
     setUser(u)
-    localStorage.setItem(AUTH_KEY, JSON.stringify({ token, user: u }))
+    const payload = { accessToken: accessToken || undefined, refreshToken: refreshToken || undefined, user: u }
+    if (accessToken) sessionStorage.setItem(TOKEN_KEY, accessToken)
+    localStorage.setItem(AUTH_KEY, JSON.stringify(payload))
   }
 
   function logout() {
     localStorage.removeItem(AUTH_KEY)
+    sessionStorage.removeItem(TOKEN_KEY)
     setUser(null)
   }
 

@@ -1,8 +1,7 @@
 /**
- * Dashboard – PlayAdd / BetFury style (casino). Users, Bets, Revenue (GGR),
- * Deposits/Withdrawals INR, Gaming, Bonuses, Support, Login & Activity.
+ * Dashboard – Fetches GET /api/v1/master/dashboard. Users, Deposits, Withdrawals, Games.
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   HiUsers,
@@ -12,7 +11,6 @@ import {
   HiChartBar,
   HiHashtag,
   HiCollection,
-  HiCash,
   HiGift,
   HiSupport,
   HiRefresh,
@@ -20,33 +18,53 @@ import {
 import PageBanner from '../components/PageBanner'
 import { useAuth } from '../context/AuthContext'
 import { PERMISSIONS } from '../constants/roles'
+import AuthService from '../api/services/AuthService'
 
-// PlayAdd / BetFury style – professional metric labels
-const USERS_PLAYERS = [
-  { label: 'Total Users', value: '2,847', unit: '', icon: HiUsers, borderColor: 'border-teal-500', iconBg: 'bg-teal-500/10', iconColor: 'text-teal-600' },
-  { label: 'New Signups (24h)', value: '28', unit: '', icon: HiUserAdd, borderColor: 'border-sky-500', iconBg: 'bg-sky-500/10', iconColor: 'text-sky-600' },
-  { label: 'New Signups (30d)', value: '412', unit: '', icon: HiUserAdd, borderColor: 'border-emerald-500', iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-600' },
-  { label: 'Rejected Users', value: '23', unit: '', icon: HiUsers, borderColor: 'border-rose-500', iconBg: 'bg-rose-500/10', iconColor: 'text-rose-600' },
-]
-const DEPOSITS = [
-  { label: 'Total Deposit Volume', value: '₹18.2L', unit: '', icon: HiArrowDown, borderColor: 'border-green-500', iconBg: 'bg-green-500/10', iconColor: 'text-green-600' },
-  { label: 'Deposits Today', value: '₹1,24,500', unit: '', icon: HiArrowDown, borderColor: 'border-emerald-600', iconBg: 'bg-emerald-600/10', iconColor: 'text-emerald-700' },
-  { label: 'Deposits (24h)', value: '₹1,18,200', unit: '', icon: HiArrowDown, borderColor: 'border-cyan-500', iconBg: 'bg-cyan-500/10', iconColor: 'text-cyan-600' },
-  { label: 'Deposits (7d)', value: '₹4.2L', unit: '', icon: HiArrowDown, borderColor: 'border-indigo-500', iconBg: 'bg-indigo-500/10', iconColor: 'text-indigo-600' },
-  { label: 'Deposits (30d)', value: '₹18.2L', unit: '', icon: HiArrowDown, borderColor: 'border-teal-600', iconBg: 'bg-teal-600/10', iconColor: 'text-teal-700' },
-]
-const WITHDRAWALS = [
-  { label: 'Total Withdrawal Volume', value: '₹12.4L', unit: '', icon: HiArrowUp, borderColor: 'border-lime-500', iconBg: 'bg-lime-500/10', iconColor: 'text-lime-600' },
-  { label: 'Withdrawals Today', value: '₹89,200', unit: '', icon: HiArrowUp, borderColor: 'border-teal-600', iconBg: 'bg-teal-600/10', iconColor: 'text-teal-700' },
-  { label: 'Withdrawals (24h)', value: '₹82,100', unit: '', icon: HiArrowUp, borderColor: 'border-violet-500', iconBg: 'bg-violet-500/10', iconColor: 'text-violet-600' },
-  { label: 'Withdrawals (7d)', value: '₹3.1L', unit: '', icon: HiArrowUp, borderColor: 'border-amber-500', iconBg: 'bg-amber-500/10', iconColor: 'text-amber-600' },
-  { label: 'Withdrawals (30d)', value: '₹12.4L', unit: '', icon: HiArrowUp, borderColor: 'border-orange-500', iconBg: 'bg-orange-500/10', iconColor: 'text-orange-600' },
-]
-const GAMING = [
-  { label: 'Total Games', value: '156', unit: '', icon: HiCollection, borderColor: 'border-rose-500', iconBg: 'bg-rose-500/10', iconColor: 'text-rose-600' },
-  { label: 'Active Games', value: '142', unit: '', icon: HiCollection, borderColor: 'border-emerald-500', iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-600' },
-  { label: 'Inactive Games', value: '14', unit: '', icon: HiCollection, borderColor: 'border-gray-400', iconBg: 'bg-gray-400/10', iconColor: 'text-gray-600' },
-]
+function formatAmount(n) {
+  if (n == null || Number.isNaN(Number(n))) return '–'
+  return '₹' + Number(n).toLocaleString('en-IN')
+}
+
+function formatCount(n) {
+  if (n == null || Number.isNaN(Number(n))) return '–'
+  return Number(n).toLocaleString('en-IN')
+}
+
+/** Build section cards from GET /api/v1/master/dashboard response */
+function buildUsersCards(users) {
+  if (!users) return []
+  return [
+    { label: 'Total Users', value: formatCount(users.total), unit: '', icon: HiUsers, borderColor: 'border-teal-500', iconBg: 'bg-teal-500/10', iconColor: 'text-teal-600' },
+    { label: 'New Signups (24h)', value: formatCount(users.newSignup24h), unit: '', icon: HiUserAdd, borderColor: 'border-sky-500', iconBg: 'bg-sky-500/10', iconColor: 'text-sky-600' },
+    { label: 'New Signups (30d)', value: formatCount(users.newSignup30d), unit: '', icon: HiUserAdd, borderColor: 'border-emerald-500', iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-600' },
+  ]
+}
+function buildDepositCards(deposit) {
+  if (!deposit) return []
+  return [
+    { label: 'Total Deposit Volume', value: formatAmount(deposit.totalAmount), unit: '', icon: HiArrowDown, borderColor: 'border-green-500', iconBg: 'bg-green-500/10', iconColor: 'text-green-600' },
+    { label: 'Deposits (24h)', value: formatAmount(deposit.totalAmount24h), unit: '', icon: HiArrowDown, borderColor: 'border-cyan-500', iconBg: 'bg-cyan-500/10', iconColor: 'text-cyan-600' },
+    { label: 'Deposits (7d)', value: formatAmount(deposit.totalAmount7d), unit: '', icon: HiArrowDown, borderColor: 'border-indigo-500', iconBg: 'bg-indigo-500/10', iconColor: 'text-indigo-600' },
+    { label: 'Deposits (30d)', value: formatAmount(deposit.totalAmount30d), unit: '', icon: HiArrowDown, borderColor: 'border-teal-600', iconBg: 'bg-teal-600/10', iconColor: 'text-teal-700' },
+  ]
+}
+function buildWithdrawalCards(withdrawal) {
+  if (!withdrawal) return []
+  return [
+    { label: 'Total Withdrawal Volume', value: formatAmount(withdrawal.totalAmount), unit: '', icon: HiArrowUp, borderColor: 'border-lime-500', iconBg: 'bg-lime-500/10', iconColor: 'text-lime-600' },
+    { label: 'Withdrawals (24h)', value: formatAmount(withdrawal.totalAmount24h), unit: '', icon: HiArrowUp, borderColor: 'border-violet-500', iconBg: 'bg-violet-500/10', iconColor: 'text-violet-600' },
+    { label: 'Withdrawals (7d)', value: formatAmount(withdrawal.totalAmount7d), unit: '', icon: HiArrowUp, borderColor: 'border-amber-500', iconBg: 'bg-amber-500/10', iconColor: 'text-amber-600' },
+    { label: 'Withdrawals (30d)', value: formatAmount(withdrawal.totalAmount30d), unit: '', icon: HiArrowUp, borderColor: 'border-orange-500', iconBg: 'bg-orange-500/10', iconColor: 'text-orange-600' },
+  ]
+}
+function buildGamesCards(games) {
+  if (!games) return []
+  return [
+    { label: 'Total Games', value: formatCount(games.total), unit: '', icon: HiCollection, borderColor: 'border-rose-500', iconBg: 'bg-rose-500/10', iconColor: 'text-rose-600' },
+    { label: 'Active Games', value: formatCount(games.activeCount), unit: '', icon: HiCollection, borderColor: 'border-emerald-500', iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-600' },
+    { label: 'Inactive Games', value: formatCount(games.inactiveCount), unit: '', icon: HiCollection, borderColor: 'border-gray-400', iconBg: 'bg-gray-400/10', iconColor: 'text-gray-600' },
+  ]
+}
 const BETS = [
   { label: 'Total Bets', value: '1,24,892', unit: '', icon: HiHashtag, borderColor: 'border-purple-500', iconBg: 'bg-purple-500/10', iconColor: 'text-purple-600' },
   { label: 'Bets Today', value: '8,421', unit: '', icon: HiHashtag, borderColor: 'border-fuchsia-500', iconBg: 'bg-fuchsia-500/10', iconColor: 'text-fuchsia-600' },
@@ -63,13 +81,15 @@ const SUPPORT = [
   { label: 'Resolved Today', value: '14', unit: '', icon: HiSupport, borderColor: 'border-cyan-500', iconBg: 'bg-cyan-500/10', iconColor: 'text-cyan-600' },
 ]
 
-const LOGIN_ACTIVITY = [
-  { id: 1, activity: 'LOGIN_SUCCESS', activityType: 'success', ip: '192.168.1.1', dateTime: '2026-02-20 14:32:15' },
-  { id: 2, activity: 'LOGIN_OTP_SENT', activityType: 'teal', ip: '192.168.1.1', dateTime: '2026-02-20 14:30:02' },
-  { id: 3, activity: 'LOGIN_SUCCESS', activityType: 'success', ip: '10.0.0.5', dateTime: '2026-02-20 13:15:44' },
-  { id: 4, activity: 'LOGIN_SUCCESS', activityType: 'success', ip: '192.168.1.1', dateTime: '2026-02-20 11:00:22' },
-  { id: 5, activity: 'LOGIN_SUCCESS', activityType: 'success', ip: '10.0.0.5', dateTime: '2026-02-20 09:45:11' },
-]
+function formatLogDateTime(iso) {
+  if (!iso) return '–'
+  try {
+    const d = new Date(iso)
+    return d.toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'medium' })
+  } catch {
+    return iso
+  }
+}
 
 function MetricCard({ label, value, unit, icon: Icon, borderColor, iconBg, iconColor }) {
   return (
@@ -87,15 +107,26 @@ function MetricCard({ label, value, unit, icon: Icon, borderColor, iconBg, iconC
   )
 }
 
-function Section({ title, cards }) {
+function Section({ title, cards, loading }) {
   return (
     <section>
       <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">{title}</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {cards.map((card) => (
-          <MetricCard key={card.label} {...card} />
-        ))}
-      </div>
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 animate-pulse">
+              <div className="h-4 bg-gray-200 rounded w-2/3 mb-3" />
+              <div className="h-8 bg-gray-200 rounded w-1/2" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          {cards.map((card) => (
+            <MetricCard key={card.label} {...card} />
+          ))}
+        </div>
+      )}
     </section>
   )
 }
@@ -103,7 +134,14 @@ function Section({ title, cards }) {
 export default function Dashboard() {
   const { hasPermission, user, getSubAdminCapabilities } = useAuth()
   const caps = getSubAdminCapabilities()
-  const [activityLogs, setActivityLogs] = useState(LOGIN_ACTIVITY)
+  const [adminLogs, setAdminLogs] = useState([])
+  const [adminLogsPagination, setAdminLogsPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 })
+  const [adminLogsPage, setAdminLogsPage] = useState(1)
+  const [adminLogsActivity, setAdminLogsActivity] = useState('')
+  const [adminLogsLoading, setAdminLogsLoading] = useState(true)
+  const [dashboardData, setDashboardData] = useState(null)
+  const [dashboardLoading, setDashboardLoading] = useState(true)
+  const [dashboardError, setDashboardError] = useState(null)
 
   const canViewUsers = hasPermission(PERMISSIONS.VIEW_USERS)
   const canViewDeposits = hasPermission(PERMISSIONS.VIEW_DEPOSITS)
@@ -113,8 +151,58 @@ export default function Dashboard() {
   const canViewReports = hasPermission(PERMISSIONS.VIEW_REPORTS)
   const canViewTickets = hasPermission(PERMISSIONS.VIEW_TICKETS)
 
+  useEffect(() => {
+    setDashboardLoading(true)
+    setDashboardError(null)
+    AuthService.getMasterDashboard()
+      .then((res) => {
+        if (res?.success && res?.data) {
+          setDashboardData(res.data)
+          setDashboardError(null)
+        } else {
+          setDashboardData(null)
+          setDashboardError(res?.message || 'Failed to load dashboard')
+        }
+      })
+      .catch(() => {
+        setDashboardData(null)
+        setDashboardError('Failed to load dashboard')
+      })
+      .finally(() => setDashboardLoading(false))
+  }, [])
+
+  const usersCards = buildUsersCards(dashboardData?.users)
+  const depositCards = buildDepositCards(dashboardData?.deposit)
+  const withdrawalCards = buildWithdrawalCards(dashboardData?.withdrawal)
+  const gamesCards = buildGamesCards(dashboardData?.games)
+
+  function fetchAdminLogs(page = 1, activity = '') {
+    setAdminLogsLoading(true)
+    const params = { page, limit: 20 }
+    if (activity) params.activity = activity
+    AuthService.getMasterAdminLogs(params)
+      .then((res) => {
+        if (res?.success && res?.data) {
+          setAdminLogs(res.data.logs || [])
+          setAdminLogsPagination(res.data.pagination || { page: 1, limit: 20, total: 0, totalPages: 1 })
+        } else {
+          setAdminLogs([])
+          setAdminLogsPagination({ page: 1, limit: 20, total: 0, totalPages: 1 })
+        }
+      })
+      .catch(() => {
+        setAdminLogs([])
+        setAdminLogsPagination({ page: 1, limit: 20, total: 0, totalPages: 1 })
+      })
+      .finally(() => setAdminLogsLoading(false))
+  }
+
+  useEffect(() => {
+    fetchAdminLogs(adminLogsPage, adminLogsActivity)
+  }, [adminLogsPage, adminLogsActivity])
+
   function handleRefreshActivity() {
-    setActivityLogs((prev) => [...prev].sort(() => Math.random() - 0.5))
+    fetchAdminLogs(adminLogsPage, adminLogsActivity)
   }
 
   return (
@@ -127,17 +215,47 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* USERS & PLAYERS */}
-      {canViewUsers && <Section title="Users & Players" cards={USERS_PLAYERS} />}
+      {dashboardError && (
+        <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
+          {dashboardError}
+        </div>
+      )}
+
+      {/* USERS & PLAYERS – from GET /api/v1/master/dashboard */}
+      {canViewUsers && (
+        <Section
+          title="Users & Players"
+          cards={dashboardLoading ? [] : usersCards}
+          loading={dashboardLoading}
+        />
+      )}
 
       {/* DEPOSITS */}
-      {canViewDeposits && <Section title="Deposits" cards={DEPOSITS} />}
+      {canViewDeposits && (
+        <Section
+          title="Deposits"
+          cards={dashboardLoading ? [] : depositCards}
+          loading={dashboardLoading}
+        />
+      )}
 
       {/* WITHDRAWALS */}
-      {canViewWithdrawals && <Section title="Withdrawals" cards={WITHDRAWALS} />}
+      {canViewWithdrawals && (
+        <Section
+          title="Withdrawals"
+          cards={dashboardLoading ? [] : withdrawalCards}
+          loading={dashboardLoading}
+        />
+      )}
 
       {/* GAMING */}
-      {(canViewGames || canViewReports) && <Section title="Gaming" cards={GAMING} />}
+      {(canViewGames || canViewReports) && (
+        <Section
+          title="Gaming"
+          cards={dashboardLoading ? [] : gamesCards}
+          loading={dashboardLoading}
+        />
+      )}
 
       {/* BETS */}
       {(canViewGames || canViewReports) && <Section title="Bets" cards={BETS} />}
@@ -148,57 +266,110 @@ export default function Dashboard() {
       {/* SUPPORT */}
       {canViewTickets && <Section title="Support" cards={SUPPORT} />}
 
-      {/* Login & Activity table */}
+      {/* Login & Activity – GET /api/v1/master/admin-logs */}
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-semibold text-gray-900">Login & Activity</h3>
-            <span className="text-sm text-gray-500">Recent admin login history</span>
+            <span className="text-sm text-gray-500">Admin login history</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={adminLogsActivity}
+              onChange={(e) => { setAdminLogsActivity(e.target.value); setAdminLogsPage(1); }}
+              className="px-3 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm focus:border-teal-500 focus:outline-none"
+            >
+              <option value="">All activity</option>
+              <option value="login">Login</option>
+            </select>
             <Link to="/audit-logs" className="text-sm font-medium text-teal-600 hover:text-teal-700">
               View all logs
             </Link>
             <button
               type="button"
               onClick={handleRefreshActivity}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
+              disabled={adminLogsLoading}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
             >
               <HiRefresh className="w-4 h-4" /> Refresh
             </button>
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[500px]">
+          <table className="w-full min-w-[600px]">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
                 <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">#</th>
                 <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Activity</th>
+                <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</th>
                 <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">IP Address</th>
                 <th className="text-left py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date & Time</th>
               </tr>
             </thead>
             <tbody>
-              {activityLogs.map((row, index) => (
-                <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-3 px-5 text-sm text-gray-600">{index + 1}</td>
-                  <td className="py-3 px-5">
-                    <span className="inline-flex items-center gap-2">
-                      <span
-                        className={`w-2 h-2 rounded-full ${
-                          row.activityType === 'success' ? 'bg-emerald-500' : 'bg-teal-500'
-                        }`}
-                      />
-                      <span className="text-sm font-medium text-gray-900">{row.activity}</span>
-                    </span>
+              {adminLogsLoading ? (
+                <tr>
+                  <td colSpan={5} className="py-8 px-5 text-center text-gray-500 text-sm">
+                    Loading…
                   </td>
-                  <td className="py-3 px-5 text-sm text-gray-600 font-mono">{row.ip}</td>
-                  <td className="py-3 px-5 text-sm text-gray-500">{row.dateTime}</td>
                 </tr>
-              ))}
+              ) : adminLogs.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 px-5 text-center text-gray-500 text-sm">
+                    No logs found
+                  </td>
+                </tr>
+              ) : (
+                adminLogs.map((row, index) => (
+                  <tr key={row._id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-3 px-5 text-sm text-gray-600">
+                      {(adminLogsPagination.page - 1) * adminLogsPagination.limit + index + 1}
+                    </td>
+                    <td className="py-3 px-5">
+                      <span className="inline-flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="text-sm font-medium text-gray-900">{row.activity || '–'}</span>
+                      </span>
+                    </td>
+                    <td className="py-3 px-5 text-sm text-gray-700">
+                      {row.admin?.fullName || row.admin?.email || '–'}
+                      {row.admin?.email && row.admin?.fullName && (
+                        <span className="block text-gray-500 text-xs">{row.admin.email}</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-5 text-sm text-gray-600 font-mono">{row.ipAddress || '–'}</td>
+                    <td className="py-3 px-5 text-sm text-gray-500">{formatLogDateTime(row.dateTime)}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
+        {!adminLogsLoading && adminLogs.length > 0 && adminLogsPagination.totalPages > 1 && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 bg-gray-50">
+            <p className="text-sm text-gray-500">
+              Page {adminLogsPagination.page} of {adminLogsPagination.totalPages} ({adminLogsPagination.total} total)
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setAdminLogsPage((p) => Math.max(1, p - 1))}
+                disabled={adminLogsPagination.page <= 1}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none"
+              >
+                Prev
+              </button>
+              <button
+                type="button"
+                onClick={() => setAdminLogsPage((p) => Math.min(adminLogsPagination.totalPages, p + 1))}
+                disabled={adminLogsPagination.page >= adminLogsPagination.totalPages}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

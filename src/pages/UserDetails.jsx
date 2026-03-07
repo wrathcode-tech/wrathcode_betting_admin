@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import {
   HiChevronRight,
+  HiChevronLeft,
   HiUser,
   HiArrowLeft,
   HiIdentification,
@@ -21,7 +22,21 @@ import PageBanner from '../components/PageBanner'
 import Badge from '../components/ui/Badge'
 import { useAuth } from '../context/AuthContext'
 import { PERMISSIONS } from '../constants/roles'
-import { getUserById, getUserBets, getDepositsByUser, getWithdrawalsByUser, getTicketsByUser, getReferralByUser } from '../services/api'
+import AuthService from '../api/services/AuthService'
+import { getTicketsByUser, getReferralByUser } from '../services/api'
+
+/** Normalize API user (e.g. from GET /api/v1/master/users/:userId) to page shape */
+function normalizeUserDetail(apiUser) {
+  if (!apiUser) return null
+  const raw = apiUser.user ?? apiUser
+  return {
+    ...raw,
+    id: raw._id ?? raw.id,
+    name: raw.fullName ?? raw.name,
+    phone: raw.mobile ? (raw.countryCode ? `${raw.countryCode} ${raw.mobile}` : raw.mobile) : raw.phone,
+    status: raw.accountStatus ?? raw.status,
+  }
+}
 
 function formatDateTime(iso) {
   if (!iso) return '–'
@@ -94,21 +109,53 @@ export default function UserDetails() {
   const { userId } = useParams()
   const navigate = useNavigate()
   const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('user-details')
-  const [bets, setBets] = useState([])
-  const [deposits, setDeposits] = useState([])
-  const [withdrawals, setWithdrawals] = useState([])
   const [tickets, setTickets] = useState([])
   const [referralData, setReferralData] = useState(null)
+  const [wallet, setWallet] = useState(null)
+  const [walletLoading, setWalletLoading] = useState(false)
+  const [walletError, setWalletError] = useState(null)
+  const [transactions, setTransactions] = useState([])
+  const [txPagination, setTxPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 })
+  const [txLoading, setTxLoading] = useState(false)
+  const [txError, setTxError] = useState(null)
+  const [txPage, setTxPage] = useState(1)
+  const [txLimit, setTxLimit] = useState(20)
+  const [txType, setTxType] = useState('')
+  const [gameHistory, setGameHistory] = useState([])
+  const [ghPagination, setGhPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 })
+  const [ghLoading, setGhLoading] = useState(false)
+  const [ghError, setGhError] = useState(null)
+  const [ghPage, setGhPage] = useState(1)
+  const [ghLimit, setGhLimit] = useState(20)
+  const [ghGameCode, setGhGameCode] = useState('')
+  const [ghProviderCode, setGhProviderCode] = useState('')
   const { getAssignedUserIds, hasPermission, getSubAdminCapabilities } = useAuth()
   const caps = getSubAdminCapabilities()
   const canManagePersonalLimits = hasPermission(PERMISSIONS.EDIT_USERS) || caps.canManagePersonalLimits
-  const [personalLimits, setPersonalLimits] = useState({ maxSingleBet: user?.maxSingleBet ?? 10000, dailyLossLimit: user?.dailyLossLimit ?? 50000 })
+  const [personalLimits, setPersonalLimits] = useState({ maxSingleBet: 10000, dailyLossLimit: 50000 })
   const [limitsEditMode, setLimitsEditMode] = useState(false)
 
   useEffect(() => {
     if (!userId) return
-    getUserById(userId).then((r) => setUser(r.data || null))
+    setLoading(true)
+    setError(null)
+    AuthService.getMasterUserById(userId)
+      .then((res) => {
+        if (res?.success && res?.data) {
+          setUser(normalizeUserDetail(res.data))
+        } else {
+          setUser(null)
+          setError(res?.message || 'User not found')
+        }
+      })
+      .catch(() => {
+        setUser(null)
+        setError('Failed to load user')
+      })
+      .finally(() => setLoading(false))
   }, [userId])
 
   useEffect(() => {
@@ -124,17 +171,95 @@ export default function UserDetails() {
 
   useEffect(() => {
     if (!user?.id) return
-    getUserBets(user.id).then((r) => setBets(r.data || []))
-    getDepositsByUser(user.id).then((r) => setDeposits(r.data || []))
-    getWithdrawalsByUser(user.id).then((r) => setWithdrawals(r.data || []))
     getTicketsByUser(user.id).then((r) => setTickets(r.data || []))
     getReferralByUser(user.id).then((r) => setReferralData(r.data || null))
   }, [user?.id])
 
-  if (!user) {
+  useEffect(() => {
+    if (activeTab !== 'wallet-details' || !userId) return
+    setWalletLoading(true)
+    setWalletError(null)
+    AuthService.getMasterUserWallet(userId)
+      .then((res) => {
+        if (res?.success && res?.data?.wallet) {
+          setWallet(res.data.wallet)
+          setWalletError(null)
+        } else {
+          setWallet(null)
+          setWalletError(res?.message || 'Failed to load wallet')
+        }
+      })
+      .catch(() => {
+        setWallet(null)
+        setWalletError('Failed to load wallet')
+      })
+      .finally(() => setWalletLoading(false))
+  }, [activeTab, userId])
+
+  useEffect(() => {
+    if (activeTab !== 'deposit-withdrawal' || !userId) return
+    setTxLoading(true)
+    setTxError(null)
+    const params = { page: txPage, limit: txLimit }
+    if (txType) params.type = txType
+    AuthService.getMasterUserTransactions(userId, params)
+      .then((res) => {
+        if (res?.success && res?.data) {
+          setTransactions(res.data.transactions || [])
+          setTxPagination(res.data.pagination || { page: 1, limit: 20, total: 0, totalPages: 1 })
+          setTxError(null)
+        } else {
+          setTransactions([])
+          setTxError(res?.message || 'Failed to load transactions')
+        }
+      })
+      .catch(() => {
+        setTransactions([])
+        setTxError('Failed to load transactions')
+      })
+      .finally(() => setTxLoading(false))
+  }, [activeTab, userId, txPage, txLimit, txType])
+
+  useEffect(() => {
+    if (activeTab !== 'game-history' || !userId) return
+    setGhLoading(true)
+    setGhError(null)
+    const params = { page: ghPage, limit: ghLimit }
+    if (ghGameCode.trim()) params.gameCode = ghGameCode.trim()
+    if (ghProviderCode.trim()) params.providerCode = ghProviderCode.trim()
+    AuthService.getMasterUserGameHistory(userId, params)
+      .then((res) => {
+        if (res?.success && res?.data) {
+          setGameHistory(res.data.transactions || [])
+          setGhPagination(res.data.pagination || { page: 1, limit: 20, total: 0, totalPages: 1 })
+          setGhError(null)
+        } else {
+          setGameHistory([])
+          setGhError(res?.message || 'Failed to load game history')
+        }
+      })
+      .catch(() => {
+        setGameHistory([])
+        setGhError('Failed to load game history')
+      })
+      .finally(() => setGhLoading(false))
+  }, [activeTab, userId, ghPage, ghLimit, ghGameCode, ghProviderCode])
+
+  if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
         <p className="text-gray-500">Loading user...</p>
+      </div>
+    )
+  }
+
+  if (error || !user) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <p className="text-gray-500">{error || 'User not found'}</p>
+        <Link to="/users" className="text-teal-600 hover:text-teal-700 font-medium text-sm">
+          Back to User List
+        </Link>
       </div>
     )
   }
@@ -294,72 +419,126 @@ export default function UserDetails() {
 
           {activeTab === 'wallet-details' && (
             <Card title="Wallet Details" icon={HiCash}>
-              <Row label="Main Balance (INR)" value={`₹${(user.balanceFiat ?? 0).toLocaleString()}`} />
-              <Row label="Bonus Balance (INR)" value={`₹${(user.bonusBalance ?? 0).toLocaleString()}`} />
-              <Row label="Total" value={`₹${totalBalance.toLocaleString()}`} />
+              {walletLoading ? (
+                <p className="text-sm text-gray-500">Loading wallet…</p>
+              ) : walletError ? (
+                <p className="text-sm text-red-600">{walletError}</p>
+              ) : wallet ? (
+                <>
+                  <Row label="User ID" value={wallet.userId} />
+                  <Row label="Balance" value={wallet.currency === 'INR' ? `₹${Number(wallet.balance ?? 0).toLocaleString()}` : `${wallet.currency} ${Number(wallet.balance ?? 0).toLocaleString()}`} />
+                  <Row label="Currency" value={wallet.currency ?? '–'} />
+                  <Row label="Bonus Balance" value={wallet.currency === 'INR' ? `₹${Number(wallet.bonusBalance ?? 0).toLocaleString()}` : `${wallet.currency} ${Number(wallet.bonusBalance ?? 0).toLocaleString()}`} />
+                  <Row label="Total (Balance + Bonus)" value={wallet.currency === 'INR' ? `₹${(Number(wallet.balance ?? 0) + Number(wallet.bonusBalance ?? 0)).toLocaleString()}` : `${(Number(wallet.balance ?? 0) + Number(wallet.bonusBalance ?? 0)).toLocaleString()}`} />
+                  <Row label="Total Deposited" value={wallet.currency === 'INR' ? `₹${Number(wallet.totalDeposited ?? 0).toLocaleString()}` : `${Number(wallet.totalDeposited ?? 0).toLocaleString()}`} />
+                  <Row label="Total Withdrawn" value={wallet.currency === 'INR' ? `₹${Number(wallet.totalWithdrawn ?? 0).toLocaleString()}` : `${Number(wallet.totalWithdrawn ?? 0).toLocaleString()}`} />
+                  <Row label="Total Bonus Credited" value={wallet.currency === 'INR' ? `₹${Number(wallet.totalBonusCredited ?? 0).toLocaleString()}` : `${Number(wallet.totalBonusCredited ?? 0).toLocaleString()}`} />
+                  <Row label="Total Bonus Consumed" value={wallet.currency === 'INR' ? `₹${Number(wallet.totalBonusConsumed ?? 0).toLocaleString()}` : `${Number(wallet.totalBonusConsumed ?? 0).toLocaleString()}`} />
+                  <Row label="Last Deposit At" value={formatDateTime(wallet.lastDepositAt)} />
+                  <Row label="Last Withdraw At" value={formatDateTime(wallet.lastWithdrawAt)} />
+                  <Row label="Created At" value={formatDateTime(wallet.createdAt)} />
+                  <Row label="Updated At" value={formatDateTime(wallet.updatedAt)} />
+                </>
+              ) : (
+                <p className="text-sm text-gray-500">No wallet data.</p>
+              )}
             </Card>
           )}
 
           {activeTab === 'deposit-withdrawal' && (
             <div className="space-y-4">
-              <Card title="Deposits" icon={HiCreditCard}>
-                {deposits.length === 0 ? (
-                  <p className="text-sm text-gray-500">No deposits yet.</p>
+              <Card title="Deposit / Withdrawal History" icon={HiCreditCard}>
+                <div className="flex flex-wrap items-center gap-3 mb-4">
+                  <select
+                    value={txType}
+                    onChange={(e) => { setTxType(e.target.value); setTxPage(1); }}
+                    className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-gray-700 text-sm focus:border-teal-500 focus:outline-none"
+                  >
+                    <option value="">All</option>
+                    <option value="deposit">Deposit</option>
+                    <option value="withdrawal">Withdrawal</option>
+                  </select>
+                  <select
+                    value={txLimit}
+                    onChange={(e) => { setTxLimit(Number(e.target.value)); setTxPage(1); }}
+                    className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-gray-700 text-sm focus:border-teal-500 focus:outline-none"
+                  >
+                    <option value={10}>10 / page</option>
+                    <option value={20}>20 / page</option>
+                    <option value={50}>50 / page</option>
+                    <option value={100}>100 / page</option>
+                  </select>
+                </div>
+                {txLoading ? (
+                  <p className="text-sm text-gray-500">Loading transactions…</p>
+                ) : txError ? (
+                  <p className="text-sm text-red-600">{txError}</p>
+                ) : transactions.length === 0 ? (
+                  <p className="text-sm text-gray-500">No transactions yet.</p>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-200 text-left text-gray-500">
-                          <th className="py-2 pr-4">ID</th>
-                          <th className="py-2 pr-4">Amount</th>
-                          <th className="py-2 pr-4">Method</th>
-                          <th className="py-2 pr-4">Status</th>
-                          <th className="py-2">Created</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {deposits.map((d) => (
-                          <tr key={d.id} className="border-b border-gray-100">
-                            <td className="py-2.5 pr-4 font-mono text-gray-700">{d.id}</td>
-                            <td className="py-2.5 pr-4 font-medium">₹{Number(d.amount).toLocaleString()}</td>
-                            <td className="py-2.5 pr-4">{d.method}</td>
-                            <td className="py-2.5 pr-4"><Badge variant={d.status === 'completed' ? 'success' : 'warning'}>{d.status}</Badge></td>
-                            <td className="py-2.5 text-gray-500">{formatDateTime(d.createdAt)}</td>
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-200 text-left text-gray-500">
+                            <th className="py-2 pr-4">Type</th>
+                            <th className="py-2 pr-4">Amount</th>
+                            <th className="py-2 pr-4">Credit</th>
+                            <th className="py-2 pr-4">Debit</th>
+                            <th className="py-2 pr-4">Status</th>
+                            <th className="py-2 pr-4">Balance Before</th>
+                            <th className="py-2 pr-4">Balance After</th>
+                            <th className="py-2 pr-4">Remarks</th>
+                            <th className="py-2">Created</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </Card>
-              <Card title="Withdrawals" icon={HiCash}>
-                {withdrawals.length === 0 ? (
-                  <p className="text-sm text-gray-500">No withdrawals yet.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-200 text-left text-gray-500">
-                          <th className="py-2 pr-4">ID</th>
-                          <th className="py-2 pr-4">Amount</th>
-                          <th className="py-2 pr-4">Method</th>
-                          <th className="py-2 pr-4">Status</th>
-                          <th className="py-2">Created</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {withdrawals.map((w) => (
-                          <tr key={w.id} className="border-b border-gray-100">
-                            <td className="py-2.5 pr-4 font-mono text-gray-700">{w.id}</td>
-                            <td className="py-2.5 pr-4 font-medium">₹{Number(w.amount).toLocaleString()}</td>
-                            <td className="py-2.5 pr-4">{w.method}</td>
-                            <td className="py-2.5 pr-4"><Badge variant={w.status === 'completed' || w.status === 'approved' ? 'success' : 'warning'}>{w.status}</Badge></td>
-                            <td className="py-2.5 text-gray-500">{formatDateTime(w.createdAt)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {transactions.map((t) => (
+                            <tr key={t._id} className="border-b border-gray-100">
+                              <td className="py-2.5 pr-4">
+                                <Badge variant={t.type === 'deposit' ? 'success' : 'warning'}>{t.type || '–'}</Badge>
+                              </td>
+                              <td className="py-2.5 pr-4 font-medium">₹{Number(t.amount ?? 0).toLocaleString()}</td>
+                              <td className="py-2.5 pr-4 text-teal-600">₹{Number(t.credit ?? 0).toLocaleString()}</td>
+                              <td className="py-2.5 pr-4 text-gray-600">₹{Number(t.debit ?? 0).toLocaleString()}</td>
+                              <td className="py-2.5 pr-4">
+                                <Badge variant={t.status === 'completed' || t.status === 'success' ? 'success' : t.status === 'failed' ? 'error' : 'warning'}>{t.status || '–'}</Badge>
+                              </td>
+                              <td className="py-2.5 pr-4 text-gray-600">₹{Number(t.balanceBefore ?? 0).toLocaleString()}</td>
+                              <td className="py-2.5 pr-4 text-gray-600">₹{Number(t.balanceAfter ?? 0).toLocaleString()}</td>
+                              <td className="py-2.5 pr-4 text-gray-500 max-w-[120px] truncate" title={t.remarks}>{t.remarks || '–'}</td>
+                              <td className="py-2.5 text-gray-500">{formatDateTime(t.createdAt)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {txPagination.totalPages > 1 && (
+                      <div className="flex items-center justify-between pt-4 mt-4 border-t border-gray-200">
+                        <p className="text-sm text-gray-500">
+                          Page {txPage} of {txPagination.totalPages} ({txPagination.total} total)
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setTxPage((p) => Math.max(1, p - 1))}
+                            disabled={txPage <= 1}
+                            className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 border border-gray-200 hover:bg-gray-200 disabled:opacity-50 disabled:pointer-events-none"
+                          >
+                            <HiChevronLeft className="w-4 h-4 inline mr-1" /> Prev
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTxPage((p) => Math.min(txPagination.totalPages, p + 1))}
+                            disabled={txPage >= txPagination.totalPages}
+                            className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 border border-gray-200 hover:bg-gray-200 disabled:opacity-50 disabled:pointer-events-none"
+                          >
+                            Next <HiChevronRight className="w-4 h-4 inline ml-1" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </Card>
             </div>
@@ -367,20 +546,107 @@ export default function UserDetails() {
 
           {activeTab === 'game-history' && (
             <Card title="Game History" icon={HiCollection}>
-              <ul className="space-y-2">
-                {bets.length === 0 ? (
-                  <li className="text-sm text-gray-500">No bets yet.</li>
-                ) : (
-                  bets.map((b) => (
-                    <li key={b.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-                      <span className="text-gray-900">{b.game}</span>
-                      <span className={b.result === 'win' ? 'text-teal-600 font-medium' : 'text-gray-500'}>
-                        {b.result} ₹{(b.payout || 0).toLocaleString()}
-                      </span>
-                    </li>
-                  ))
-                )}
-              </ul>
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                <input
+                  type="text"
+                  value={ghGameCode}
+                  onChange={(e) => setGhGameCode(e.target.value)}
+                  placeholder="Game code"
+                  className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-gray-700 text-sm focus:border-teal-500 focus:outline-none w-32"
+                />
+                <input
+                  type="text"
+                  value={ghProviderCode}
+                  onChange={(e) => setGhProviderCode(e.target.value)}
+                  placeholder="Provider code"
+                  className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-gray-700 text-sm focus:border-teal-500 focus:outline-none w-32"
+                />
+                <select
+                  value={ghLimit}
+                  onChange={(e) => { setGhLimit(Number(e.target.value)); setGhPage(1); }}
+                  className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-gray-700 text-sm focus:border-teal-500 focus:outline-none"
+                >
+                  <option value={10}>10 / page</option>
+                  <option value={20}>20 / page</option>
+                  <option value={50}>50 / page</option>
+                  <option value={100}>100 / page</option>
+                </select>
+              </div>
+              {ghLoading ? (
+                <p className="text-sm text-gray-500">Loading game history…</p>
+              ) : ghError ? (
+                <p className="text-sm text-red-600">{ghError}</p>
+              ) : gameHistory.length === 0 ? (
+                <p className="text-sm text-gray-500">No game history yet.</p>
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm min-w-[800px]">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-left text-gray-500">
+                          <th className="py-2 pr-4">Game</th>
+                          <th className="py-2 pr-4">Game Code</th>
+                          <th className="py-2 pr-4">Provider</th>
+                          <th className="py-2 pr-4">Date / Time</th>
+                          <th className="py-2 pr-4">Bet Amount</th>
+                          <th className="py-2 pr-4">Result</th>
+                          <th className="py-2 pr-4">Status</th>
+                          <th className="py-2 pr-4">Profit / Loss</th>
+                          <th className="py-2 pr-4">Balance At Bet</th>
+                          <th className="py-2 pr-4">Balance After</th>
+                          <th className="py-2">Settled At</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {gameHistory.map((g, i) => (
+                          <tr key={g.providerRoundId || g.sessionId || i} className="border-b border-gray-100">
+                            <td className="py-2.5 pr-4 font-medium text-gray-900">{g.gameName || '–'}</td>
+                            <td className="py-2.5 pr-4 font-mono text-gray-600">{g.gameCode || '–'}</td>
+                            <td className="py-2.5 pr-4 text-gray-600">{g.providerCode || '–'}</td>
+                            <td className="py-2.5 pr-4 text-gray-500">{formatDateTime(g.dateTime || g.betAt)}</td>
+                            <td className="py-2.5 pr-4 font-medium">₹{Number(g.betAmount ?? 0).toLocaleString()}</td>
+                            <td className="py-2.5 pr-4">{g.result || '–'}</td>
+                            <td className="py-2.5 pr-4">
+                              <Badge variant={g.status === 'won' || g.status === 'settled' ? 'success' : g.status === 'lost' ? 'error' : 'warning'}>{g.status || '–'}</Badge>
+                            </td>
+                            <td className={`py-2.5 pr-4 font-medium ${Number(g.profitOrLoss ?? 0) >= 0 ? 'text-teal-600' : 'text-red-600'}`}>
+                              ₹{Number(g.profitOrLoss ?? 0).toLocaleString()}
+                            </td>
+                            <td className="py-2.5 pr-4 text-gray-600">₹{Number(g.balanceAtBet ?? 0).toLocaleString()}</td>
+                            <td className="py-2.5 pr-4 text-gray-600">₹{Number(g.balanceAfter ?? 0).toLocaleString()}</td>
+                            <td className="py-2.5 text-gray-500">{formatDateTime(g.settledAt)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {ghPagination.totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-4 mt-4 border-t border-gray-200">
+                      <p className="text-sm text-gray-500">
+                        Page {ghPage} of {ghPagination.totalPages} ({ghPagination.total} total)
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setGhPage((p) => Math.max(1, p - 1))}
+                          disabled={ghPage <= 1}
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 border border-gray-200 hover:bg-gray-200 disabled:opacity-50 disabled:pointer-events-none"
+                        >
+                          <HiChevronLeft className="w-4 h-4 inline mr-1" /> Prev
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setGhPage((p) => Math.min(ghPagination.totalPages, p + 1))}
+                          disabled={ghPage >= ghPagination.totalPages}
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 border border-gray-200 hover:bg-gray-200 disabled:opacity-50 disabled:pointer-events-none"
+                        >
+                          Next <HiChevronRight className="w-4 h-4 inline ml-1" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </Card>
           )}
 
