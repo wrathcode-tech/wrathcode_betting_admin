@@ -216,6 +216,73 @@ const AuthService = {
     return ApiCallGet(url, headers);
   },
 
+  /** GET /api/v1/master/withdrawal-requests?status=pending|approved|rejected&page=1&limit=20 (omit status for all) → { success, data: { withdrawals, pagination } } */
+  getMasterWithdrawalRequests: async (params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterWithdrawalRequests } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.status) q.set("status", params.status);
+    if (params.page != null) q.set("page", params.page);
+    if (params.limit != null) q.set("limit", Math.min(100, Math.max(1, params.limit)));
+    const query = q.toString();
+    const url = `${baseUrl}${masterWithdrawalRequests}${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/master/withdrawal-requests/pending?page=1&limit=20 */
+  getMasterWithdrawalRequestsPending: async (params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterWithdrawalRequests } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.page != null) q.set("page", params.page);
+    if (params.limit != null) q.set("limit", Math.min(100, Math.max(1, params.limit)));
+    const query = q.toString();
+    const url = `${baseUrl}${masterWithdrawalRequests}/pending${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/master/withdrawal-requests/approved?page=1&limit=20 */
+  getMasterWithdrawalRequestsApproved: async (params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterWithdrawalRequests } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.page != null) q.set("page", params.page);
+    if (params.limit != null) q.set("limit", Math.min(100, Math.max(1, params.limit)));
+    const query = q.toString();
+    const url = `${baseUrl}${masterWithdrawalRequests}/approved${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/master/withdrawal-requests/rejected?page=1&limit=20 */
+  getMasterWithdrawalRequestsRejected: async (params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterWithdrawalRequests } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.page != null) q.set("page", params.page);
+    if (params.limit != null) q.set("limit", Math.min(100, Math.max(1, params.limit)));
+    const query = q.toString();
+    const url = `${baseUrl}${masterWithdrawalRequests}/rejected${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** PATCH /api/v1/master/withdrawal-requests/:id – body: { status: "approved"|"rejected", userId, rejectReason?, adminRemarks? } */
+  patchMasterWithdrawalRequest: async (withdrawalId, payload) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterWithdrawalRequests } = ApiConfig;
+    const url = `${baseUrl}${masterWithdrawalRequests}/${encodeURIComponent(withdrawalId)}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPatch(url, payload, headers);
+  },
+
   /** PATCH /api/v1/master/deposit-requests/:id – body: { status: "approved"|"rejected", userId, adminRemarks?, rejectReason? } */
   patchMasterDepositRequest: async (depositId, payload) => {
     const token = sessionStorage.getItem("token");

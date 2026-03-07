@@ -11,6 +11,7 @@ export const ApiConfig = {
   masterAdminLogs: "/api/v1/master/admin-logs",
   masterUsers: "/api/v1/master/users",
   masterDepositRequests: "/api/v1/master/deposit-requests",
+  masterWithdrawalRequests: "/api/v1/master/withdrawal-requests",
   masterWallets: "/api/v1/master/wallets",
   masterGames: "/api/v1/master/games",
   masterSiteSettings: "/api/v1/master/site-settings",
