@@ -22,6 +22,7 @@ import {
   HiBell,
   HiClipboardList,
   HiCog,
+  HiCreditCard,
   HiChevronLeft,
   HiLogout,
 } from 'react-icons/hi'
@@ -29,22 +30,22 @@ import { useLayout } from '../context/LayoutContext'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { PERMISSIONS } from '../constants/roles'
-import { getDeposits, getWithdrawals, getTickets } from '../services/api'
+import AuthService from '../api/services/AuthService'
 
 const navSections = [
   { key: 'main', label: 'MAIN', pill: 'ACTIVE', items: [{ to: '/', label: 'Dashboard', icon: HiChartBar, permission: PERMISSIONS.VIEW_DASHBOARD }] },
-  { key: 'platform', label: 'PLATFORM', pill: 'ACTIVE', items: [{ to: '/settings', label: 'Platform Configuration', icon: HiCog, permission: PERMISSIONS.VIEW_SETTINGS }] },
-  { key: 'admin', label: 'ADMIN', items: [{ to: '/sub-admins', label: 'Sub Admin Management', icon: HiUsers, permission: PERMISSIONS.MANAGE_ROLES }, { to: '/audit-logs', label: 'Admin Logs', icon: HiClipboardList, permission: PERMISSIONS.VIEW_AUDIT_LOG }] },
+  { key: 'platform', label: 'PLATFORM', pill: 'ACTIVE', items: [{ to: '/settings', label: 'Settings', icon: HiCog, permission: PERMISSIONS.VIEW_SETTINGS }] },
+  { key: 'admin', label: 'ADMIN', items: [{ to: '/sub-admins', label: 'Sub Admin Management', icon: HiUsers, permission: PERMISSIONS.MANAGE_ROLES }, { to: '/audit-logs', label: 'Admin Logs', icon: HiClipboardList, permission: PERMISSIONS.VIEW_AUDIT_LOG }, { to: '/deposit-accounts', label: 'Deposit Accounts', icon: HiCreditCard, permission: PERMISSIONS.VIEW_DEPOSITS }] },
   { key: 'traders', label: 'TRADERS', items: [{ to: '/users', label: 'User List', icon: HiUsers, permission: PERMISSIONS.VIEW_USERS }] },
   { key: 'wallets', label: 'WALLETS & MONEY', items: [{ to: '/wallets', label: 'Wallets', icon: HiCash, permission: PERMISSIONS.VIEW_WALLETS }, { to: '/deposits', label: 'Deposits', icon: HiArrowDown, permission: PERMISSIONS.VIEW_DEPOSITS }, { to: '/withdrawals', label: 'Withdrawals', icon: HiArrowUp, permission: PERMISSIONS.VIEW_WITHDRAWALS }, { to: '/transactions', label: 'Transactions', icon: HiCurrencyDollar, permission: PERMISSIONS.VIEW_TRANSACTIONS }, { to: '/account-settlement', label: 'Account Statement', icon: HiDocumentReport, permission: PERMISSIONS.VIEW_ACCOUNT_STATEMENT }] },
-  { key: 'gaming', label: 'GAMING', pill: 'ON', items: [{ to: '/games', label: 'Games', icon: HiCollection, permission: PERMISSIONS.VIEW_GAMES }, { to: '/bets', label: 'Bets', icon: HiTicket, permission: PERMISSIONS.MANAGE_BETTING }, { to: '/bonuses', label: 'Bonuses', icon: HiGift, permission: PERMISSIONS.VIEW_BONUSES }, { to: '/referrals', label: 'Referrals', icon: HiUserGroup, permission: PERMISSIONS.VIEW_REFERRALS }] },
-  { key: 'risk', label: 'RISK & REPORTS', items: [{ to: '/risk-fraud', label: 'Risk & Fraud', icon: HiShieldExclamation, permission: PERMISSIONS.VIEW_RISK }, { to: '/reports', label: 'Reports', icon: HiDocumentReport, permission: PERMISSIONS.VIEW_REPORTS }] },
-  { key: 'content', label: 'CONTENT & SUPPORT', items: [{ to: '/cms', label: 'CMS', icon: HiDocumentText, permission: PERMISSIONS.VIEW_CMS }, { to: '/support', label: 'Support', icon: HiSupport, permission: PERMISSIONS.VIEW_TICKETS }, { to: '/notifications', label: 'Notifications', icon: HiBell, permission: PERMISSIONS.VIEW_NOTIFICATIONS }] },
+  { key: 'gaming', label: 'GAMING', pill: 'ON', items: [{ to: '/games', label: 'Games', icon: HiCollection, permission: PERMISSIONS.VIEW_GAMES }, { to: '/bets', label: 'Bets', icon: HiTicket, permission: PERMISSIONS.MANAGE_BETTING }, { to: '/casino-history', label: 'Games History', icon: HiTicket, permission: PERMISSIONS.VIEW_CASINO_HISTORY }, { to: '/referrals', label: 'Referrals', icon: HiUserGroup, permission: PERMISSIONS.VIEW_REFERRALS }] },
+  { key: 'risk', label: 'RISK & REPORTS', items: [{ to: '/reports', label: 'Reports', icon: HiDocumentReport, permission: PERMISSIONS.VIEW_REPORTS }] },
+  { key: 'content', label: 'CONTENT & SUPPORT', items: [{ to: '/support', label: 'Support', icon: HiSupport, permission: PERMISSIONS.VIEW_TICKETS }, { to: '/notifications', label: 'Notifications', icon: HiBell, permission: PERMISSIONS.VIEW_NOTIFICATIONS }] },
 ]
 
 export default function Sidebar() {
   const { sidebarCollapsed, toggleSidebar, sidebarMobileOpen, closeMobileSidebar } = useLayout()
-  const { hasPermission, logout, getAssignedUserIds } = useAuth()
+  const { hasPermission, logout } = useAuth()
   const { addToast } = useToast()
   const navigate = useNavigate()
   const [pendingDeposits, setPendingDeposits] = useState(0)
@@ -52,27 +53,31 @@ export default function Sidebar() {
   const [pendingTickets, setPendingTickets] = useState(0)
 
   useEffect(() => {
-    const assignedIds = getAssignedUserIds()
-    getDeposits().then((r) => {
-      let list = r.data || []
-      if (assignedIds?.length) list = list.filter((d) => assignedIds.includes(d.userId))
-      setPendingDeposits(list.filter((d) => d.status === 'pending').length)
-    })
-    getWithdrawals().then((r) => {
-      let list = r.data || []
-      if (assignedIds?.length) list = list.filter((w) => assignedIds.includes(w.userId))
-      setPendingWithdrawals(list.filter((w) => w.status === 'pending').length)
-    })
-    getTickets().then((r) => {
-      const list = r.data || []
-      const open = list.filter((t) => (t.status || '').toLowerCase() === 'open').length
-      setPendingTickets(open)
-    })
-  }, [getAssignedUserIds])
+    if (hasPermission(PERMISSIONS.VIEW_DEPOSITS)) {
+      AuthService.getMasterDepositRequestsPending({ page: 1, limit: 1 })
+        .then((res) => {
+          if (res?.success && res?.data?.pagination != null) setPendingDeposits(res.data.pagination.total ?? 0)
+        })
+        .catch(() => setPendingDeposits(0))
+    }
+    if (hasPermission(PERMISSIONS.VIEW_WITHDRAWALS)) {
+      AuthService.getMasterWithdrawalRequestsPending({ page: 1, limit: 1 })
+        .then((res) => {
+          if (res?.success && res?.data?.pagination != null) setPendingWithdrawals(res.data.pagination.total ?? 0)
+        })
+        .catch(() => setPendingWithdrawals(0))
+    }
+    if (hasPermission(PERMISSIONS.VIEW_TICKETS)) {
+      AuthService.getSupportAdminTickets({ status: 'open', page: 1, limit: 1 })
+        .then((res) => {
+          if (res?.success && res?.data != null) setPendingTickets(res.data.total ?? 0)
+        })
+        .catch(() => setPendingTickets(0))
+    }
+  }, [hasPermission])
 
   const linkClass = ({ isActive }) =>
-    `flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium transition-all duration-200 border-l-4 ${
-      isActive ? 'bg-teal-50 text-teal-700 border-l-teal-500' : 'border-l-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+    `flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium transition-all duration-200 border-l-4 ${isActive ? 'bg-teal-50 text-teal-700 border-l-teal-500' : 'border-l-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900'
     }`
 
   function handleLogout() {
@@ -143,8 +148,7 @@ export default function Sidebar() {
                         onClick={closeMobileSidebar}
                         title={title}
                         className={({ isActive }) =>
-                          `flex items-center justify-center p-2.5 rounded-lg text-sm font-medium transition-all relative ${
-                            isActive ? 'bg-teal-50 text-teal-600 border-l-4 border-l-teal-500' : 'text-gray-500 hover:bg-gray-200 hover:text-gray-700'
+                          `flex items-center justify-center p-2.5 rounded-lg text-sm font-medium transition-all relative ${isActive ? 'bg-teal-50 text-teal-600 border-l-4 border-l-teal-500' : 'text-gray-500 hover:bg-gray-200 hover:text-gray-700'
                           }`
                         }
                       >

@@ -1,6 +1,5 @@
 /**
- * Referrals – Teal banner, summary cards, Referrer Leaderboard table, Payouts section.
- * Data from getReferrers(), getReferralStats(), getReferralPayouts(). UI consistent with Games/Bonuses.
+ * Referrals – Teal banner, summary cards, Referrer Leaderboard (GET /api/v1/master/users/referral-stats), Payouts section.
  */
 import { useState, useMemo, useEffect } from 'react'
 import {
@@ -11,50 +10,84 @@ import {
   HiOutlineExternalLink,
   HiCollection,
   HiReceiptTax,
+  HiChevronLeft,
+  HiChevronRight,
 } from 'react-icons/hi'
 import PageBanner from '../components/PageBanner'
 import EmptyState from '../components/EmptyState'
 import { useAuth } from '../context/AuthContext'
 import { PERMISSIONS } from '../constants/roles'
-import { getReferrers, getReferralStats, getReferralPayouts } from '../services/api'
+import { getReferralPayouts } from '../services/api'
+import AuthService from '../api/services/AuthService'
 
 function formatInr(n) {
   return `₹${Number(n || 0).toLocaleString('en-IN')}`
 }
 
-const TIER_STYLES = {
-  Platinum: 'bg-violet-100 text-violet-700',
-  Gold: 'bg-amber-100 text-amber-700',
-  Silver: 'bg-gray-200 text-gray-700',
-  Bronze: 'bg-amber-700/20 text-amber-800',
-}
+const LEADERBOARD_LIMIT = 20
 
 export default function Referrals() {
-  const [referrers, setReferrers] = useState([])
-  const [stats, setStats] = useState({ totalReferrers: 0, totalReferrals: 0, commissionPaid: 0, conversionRate: 0 })
-  const [payouts, setPayouts] = useState([])
+  const [leaderboardUsers, setLeaderboardUsers] = useState([])
+  const [leaderboardPagination, setLeaderboardPagination] = useState({ page: 1, limit: LEADERBOARD_LIMIT, total: 0, totalPages: 1 })
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false)
+  const [leaderboardError, setLeaderboardError] = useState(null)
+  const [leaderboardPage, setLeaderboardPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [tierFilter, setTierFilter] = useState('All')
+  const [summary, setSummary] = useState({
+    totalReferrersCount: 0,
+    totalReferralsCount: 0,
+    commissionPaidSum: 0,
+    conversionRate: 0,
+  })
+  const [payouts, setPayouts] = useState([])
   const [payoutTab, setPayoutTab] = useState('all') // all | pending | paid
   const { hasPermission } = useAuth()
   const canManage = hasPermission(PERMISSIONS.MANAGE_REFERRALS)
 
   useEffect(() => {
-    getReferrers().then((r) => setReferrers(Array.isArray(r.data) ? r.data : []))
-    getReferralStats().then((r) => setStats(r.data || { totalReferrers: 0, totalReferrals: 0, commissionPaid: 0, conversionRate: 0 }))
+    setLeaderboardLoading(true)
+    setLeaderboardError(null)
+    AuthService.getMasterUsersReferralStats({ page: leaderboardPage, limit: LEADERBOARD_LIMIT })
+      .then((res) => {
+        if (res?.success && res?.data) {
+          setLeaderboardUsers(res.data.users || [])
+          setLeaderboardPagination(res.data.pagination || { page: 1, limit: LEADERBOARD_LIMIT, total: 0, totalPages: 1 })
+          if (res.data.summary) {
+            setSummary({
+              totalReferrersCount: res.data.summary.totalReferrersCount ?? 0,
+              totalReferralsCount: res.data.summary.totalReferralsCount ?? 0,
+              commissionPaidSum: res.data.summary.commissionPaidSum ?? 0,
+              conversionRate: res.data.summary.conversionRate ?? 0,
+            })
+          }
+          setLeaderboardError(null)
+        } else {
+          setLeaderboardUsers([])
+          setLeaderboardPagination({ page: 1, limit: LEADERBOARD_LIMIT, total: 0, totalPages: 1 })
+          setLeaderboardError(res?.message || 'Failed to load leaderboard')
+        }
+      })
+      .catch(() => {
+        setLeaderboardUsers([])
+        setLeaderboardPagination({ page: 1, limit: LEADERBOARD_LIMIT, total: 0, totalPages: 1 })
+        setLeaderboardError('Failed to load leaderboard')
+      })
+      .finally(() => setLeaderboardLoading(false))
+  }, [leaderboardPage])
+
+  useEffect(() => {
     getReferralPayouts().then((r) => setPayouts(Array.isArray(r.data) ? r.data : []))
   }, [])
 
   const filteredReferrers = useMemo(() => {
-    return referrers.filter((r) => {
-      const matchSearch =
-        !search.trim() ||
-        (r.referrerName && r.referrerName.toLowerCase().includes(search.toLowerCase())) ||
-        (r.referrerEmail && r.referrerEmail.toLowerCase().includes(search.toLowerCase()))
-      const matchTier = tierFilter === 'All' || r.tier === tierFilter
-      return matchSearch && matchTier
-    })
-  }, [referrers, search, tierFilter])
+    if (!search.trim()) return leaderboardUsers
+    const q = search.trim().toLowerCase()
+    return leaderboardUsers.filter(
+      (r) =>
+        (r.fullName && r.fullName.toLowerCase().includes(q)) ||
+        (r.uuid && r.uuid.toLowerCase().includes(q))
+    )
+  }, [leaderboardUsers, search])
 
   const filteredPayouts = useMemo(() => {
     if (payoutTab === 'pending') return payouts.filter((p) => p.status === 'pending')
@@ -67,9 +100,9 @@ export default function Referrals() {
 
   return (
     <div className="space-y-0">
-      <PageBanner title="Referrals" subtitle="Referral program — tiers, commission, and referrer leaderboard – PlayAdd / BetFury" icon={HiUserGroup} />
+      <PageBanner title="Referrals" subtitle="Referral program — tiers, commission, and referrer leaderboard" icon={HiUserGroup} />
 
-      {/* Summary cards */}
+      {/* Summary cards – from API data.summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-6">
         <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
           <div className="flex items-center gap-3">
@@ -78,7 +111,7 @@ export default function Referrals() {
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Referrers</p>
-              <p className="text-lg font-bold text-gray-900">{(stats.totalReferrers || 0).toLocaleString('en-IN')}</p>
+              <p className="text-lg font-bold text-gray-900">{(summary.totalReferrersCount || 0).toLocaleString('en-IN')}</p>
             </div>
           </div>
         </div>
@@ -89,7 +122,7 @@ export default function Referrals() {
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Referrals</p>
-              <p className="text-lg font-bold text-gray-900">{(stats.totalReferrals || 0).toLocaleString('en-IN')}</p>
+              <p className="text-lg font-bold text-gray-900">{(summary.totalReferralsCount || 0).toLocaleString('en-IN')}</p>
             </div>
           </div>
         </div>
@@ -100,7 +133,7 @@ export default function Referrals() {
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Commission Paid</p>
-              <p className="text-lg font-bold text-gray-900">{formatInr(stats.commissionPaid)}</p>
+              <p className="text-lg font-bold text-gray-900">{formatInr(summary.commissionPaidSum)}</p>
             </div>
           </div>
         </div>
@@ -111,7 +144,7 @@ export default function Referrals() {
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Conversion Rate</p>
-              <p className="text-lg font-bold text-gray-900">{Number(stats.conversionRate || 0)}%</p>
+              <p className="text-lg font-bold text-gray-900">{Number(summary.conversionRate ?? 0)}%</p>
             </div>
           </div>
         </div>
@@ -133,72 +166,98 @@ export default function Referrals() {
               Configure Program
             </button>
           )}
-          <span className="text-sm text-gray-500">{filteredReferrers.length} referrers</span>
+          <span className="text-sm text-gray-500">{leaderboardPagination.total} referrers</span>
         </div>
       </div>
 
-      {/* Search & filter */}
+      {/* Search (client-side on current page) */}
       <div className="flex flex-col sm:flex-row gap-4 py-4">
-        <div className="relative flex-1">
+        <div className="relative flex-1 max-w-xs">
           <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or email..."
+            placeholder="Search by name or UUID..."
             className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-gray-200 text-gray-900 placeholder-gray-400 text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none"
           />
         </div>
-        <select
-          value={tierFilter}
-          onChange={(e) => setTierFilter(e.target.value)}
-          className="px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-gray-900 text-sm focus:border-teal-500 focus:outline-none"
-        >
-          <option value="All">All tiers</option>
-          <option value="Platinum">Platinum</option>
-          <option value="Gold">Gold</option>
-          <option value="Silver">Silver</option>
-          <option value="Bronze">Bronze</option>
-        </select>
       </div>
 
-      {/* Referrers table */}
+      {leaderboardError && (
+        <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm mb-4">{leaderboardError}</div>
+      )}
+
+      {/* Referrer Leaderboard table */}
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[600px]">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
                 <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Referrer</th>
-                <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Referrals</th>
-                <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Commission</th>
-                <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Tier</th>
+                <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">UUID</th>
+                <th className="text-right py-4 px-5 text-gray-600 font-semibold text-sm">Total Referrals</th>
+                <th className="text-right py-4 px-5 text-gray-600 font-semibold text-sm">Total Commission</th>
               </tr>
             </thead>
             <tbody>
-              {filteredReferrers.map((r) => (
-                <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-4 px-5">
-                    <p className="font-medium text-gray-900">{r.referrerName}</p>
-                    <p className="text-gray-500 text-sm">{r.referrerEmail}</p>
-                  </td>
-                  <td className="py-4 px-5 text-gray-700 font-medium">{r.referrals}</td>
-                  <td className="py-4 px-5 text-emerald-600 font-semibold">{formatInr(r.commission)}</td>
-                  <td className="py-4 px-5">
-                    <span className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-medium ${TIER_STYLES[r.tier] || 'bg-gray-100 text-gray-700'}`}>
-                      {r.tier}
-                    </span>
-                  </td>
+              {leaderboardLoading ? (
+                <tr>
+                  <td colSpan={4} className="py-12 text-center text-gray-500 text-sm">Loading…</td>
                 </tr>
-              ))}
+              ) : filteredReferrers.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-12 text-center text-gray-500 text-sm">No referrers found.</td>
+                </tr>
+              ) : (
+                filteredReferrers.map((r) => (
+                  <tr key={r._id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-4 px-5">
+                      <p className="font-medium text-gray-900">{r.fullName || '—'}</p>
+                    </td>
+                    <td className="py-4 px-5 font-mono text-sm text-gray-600">{r.uuid || '—'}</td>
+                    <td className="py-4 px-5 text-right text-gray-700 font-medium">{Number(r.totalReferrals ?? 0).toLocaleString('en-IN')}</td>
+                    <td className="py-4 px-5 text-right text-emerald-600 font-semibold">{formatInr(r.totalCommission)}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
+        {leaderboardPagination.totalPages > 1 && !leaderboardLoading && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 bg-gray-50">
+            <p className="text-sm text-gray-500">
+              Showing {(leaderboardPagination.page - 1) * LEADERBOARD_LIMIT + 1}–{Math.min(leaderboardPagination.page * LEADERBOARD_LIMIT, leaderboardPagination.total)} of {leaderboardPagination.total}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setLeaderboardPage((p) => Math.max(1, p - 1))}
+                disabled={leaderboardPage === 1}
+                className="p-2 rounded-lg bg-white border border-gray-200 text-gray-700 disabled:opacity-50 hover:bg-gray-50"
+              >
+                <HiChevronLeft className="w-5 h-5" />
+              </button>
+              <span className="flex items-center px-2 text-sm text-gray-600">
+                {leaderboardPage} / {leaderboardPagination.totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setLeaderboardPage((p) => Math.min(leaderboardPagination.totalPages, p + 1))}
+                disabled={leaderboardPage >= leaderboardPagination.totalPages}
+                className="p-2 rounded-lg bg-white border border-gray-200 text-gray-700 disabled:opacity-50 hover:bg-gray-50"
+              >
+                <HiChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {filteredReferrers.length === 0 && (
+      {filteredReferrers.length === 0 && !leaderboardLoading && (
         <EmptyState
           title="No referrers found"
-          message={referrers.length === 0 ? 'Referral data will appear here once users start referring.' : 'Try changing search or tier filter.'}
+          message={leaderboardUsers.length === 0 ? 'Referral data will appear here once users start referring.' : 'Try changing search.'}
         />
       )}
 

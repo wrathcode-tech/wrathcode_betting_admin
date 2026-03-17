@@ -9,6 +9,9 @@ import {
   HiSave,
   HiCalendar,
   HiCollection,
+  HiCash,
+  HiPlay,
+  HiChartBar,
   HiArrowDown,
   HiArrowUp,
   HiGift,
@@ -23,29 +26,44 @@ import AuthService from '../api/services/AuthService'
 
 const STORAGE_KEY = 'crownbet-admin-settings'
 
-/** API settings keys → form.serviceControls keys */
+/** Platform configuration API keys (GET/PATCH /api/v1/master/platform-configuration) ↔ form.serviceControls keys */
 const API_TO_FORM = {
-  gamingBettingEnabled: 'games',
-  depositEnabled: 'deposits',
-  withdrawalEnabled: 'withdrawals',
-  bonusesEnabled: 'bonuses',
-  referralsEnabled: 'referrals',
-  supportEnabled: 'support',
+  gameServiceStatus: 'games',
+  bettingServiceStatus: 'betting',
+  inPlayServiceStatus: 'inPlay',
+  sportsBookServiceStatus: 'sportsBook',
+  depositServiceStatus: 'deposits',
+  withdrawalServiceStatus: 'withdrawals',
+  bonusServiceStatus: 'bonuses',
+  referralServiceStatus: 'referrals',
+  supportServiceStatus: 'support',
 }
 const FORM_TO_API = {
-  games: 'gamingBettingEnabled',
-  deposits: 'depositEnabled',
-  withdrawals: 'withdrawalEnabled',
-  bonuses: 'bonusesEnabled',
-  referrals: 'referralsEnabled',
-  support: 'supportEnabled',
+  games: 'gameServiceStatus',
+  betting: 'bettingServiceStatus',
+  inPlay: 'inPlayServiceStatus',
+  sportsBook: 'sportsBookServiceStatus',
+  deposits: 'depositServiceStatus',
+  withdrawals: 'withdrawalServiceStatus',
+  bonuses: 'bonusServiceStatus',
+  referrals: 'referralServiceStatus',
+  support: 'supportServiceStatus',
+}
+
+/** Normalize API value to boolean: true / "true" → on, false / "false" / null / 0 → off */
+function apiValueToBoolean(value) {
+  if (value === true || value === 'true' || value === 1) return true
+  if (value === false || value === 'false' || value === 0 || value === null) return false
+  return Boolean(value)
 }
 
 function apiSettingsToForm(settings) {
   if (!settings || typeof settings !== 'object') return defaultSettings.serviceControls
   const out = { ...defaultSettings.serviceControls }
   Object.entries(API_TO_FORM).forEach(([apiKey, formKey]) => {
-    if (settings[apiKey] !== undefined) out[formKey] = !!settings[apiKey]
+    if (settings[apiKey] !== undefined) {
+      out[formKey] = apiValueToBoolean(settings[apiKey])
+    }
   })
   return out
 }
@@ -64,6 +82,9 @@ const defaultSettings = {
   maintenanceMode: false,
   serviceControls: {
     games: true,
+    betting: true,
+    inPlay: true,
+    sportsBook: true,
     deposits: true,
     withdrawals: true,
     bonuses: true,
@@ -80,12 +101,16 @@ const defaultSettings = {
     minWithdrawalFiat: 500,
     maxWithdrawalFiatPerDay: 100000,
     newAccountWithdrawalHoldHours: 24,
+    bonusPercentage: 10,
   },
   fiatCurrencies: [{ code: 'INR', enabled: true, minDeposit: 100 }, { code: 'USD', enabled: true, minDeposit: 10 }],
 }
 
 const SERVICE_CONTROLS = [
-  { key: 'games', label: 'Games / Betting', description: 'Enable or disable placing bets on casino games', icon: HiCollection },
+  { key: 'games', label: 'Games', description: 'Enable or disable casino games', icon: HiCollection },
+  // { key: 'betting', label: 'Betting', description: 'Enable or disable placing bets', icon: HiCash },
+  { key: 'inPlay', label: 'In-Play', description: 'Enable or disable in-play betting', icon: HiPlay },
+  { key: 'sportsBook', label: 'Sportsbook', description: 'Enable or disable sportsbook betting', icon: HiChartBar },
   { key: 'deposits', label: 'Deposit', description: 'Enable or disable deposit requests', icon: HiArrowDown },
   { key: 'withdrawals', label: 'Withdrawal', description: 'Enable or disable withdrawal requests', icon: HiArrowUp },
   { key: 'bonuses', label: 'Bonuses', description: 'Enable or disable bonus claims and promo codes', icon: HiGift },
@@ -93,7 +118,13 @@ const SERVICE_CONTROLS = [
   { key: 'support', label: 'Support', description: 'Enable or disable ticket creation', icon: HiSupport },
 ]
 
+const TABS = [
+  { id: 'platform', label: 'Platform Configuration' },
+  { id: 'settings', label: 'Settings' },
+]
+
 export default function Settings() {
+  const [activeTab, setActiveTab] = useState('platform')
   const [form, setForm] = useState(defaultSettings)
   const [scheduleFeature, setScheduleFeature] = useState('')
   const [scheduleAction, setScheduleAction] = useState('')
@@ -101,6 +132,9 @@ export default function Settings() {
   const [siteSettingsLoading, setSiteSettingsLoading] = useState(true)
   const [siteSettingsError, setSiteSettingsError] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [limitsSaving, setLimitsSaving] = useState(false)
+  const [togglingKey, setTogglingKey] = useState(null)
+  const [togglingFullMaintenance, setTogglingFullMaintenance] = useState(false)
   const { addToast } = useToast()
   const { hasPermission } = useAuth()
   const canEdit = hasPermission(PERMISSIONS.EDIT_SETTINGS)
@@ -125,19 +159,26 @@ export default function Settings() {
   useEffect(() => {
     setSiteSettingsLoading(true)
     setSiteSettingsError(null)
-    AuthService.getMasterSiteSettings()
+    AuthService.getPlatformConfiguration()
       .then((res) => {
-        if (res?.success && res?.data?.settings) {
+        if (res?.success && res?.data) {
+          // GET response: gameServiceStatus, fullSystemStatus, etc. → toggles
+          const raw = res.data
+          const config =
+            raw && typeof raw === 'object' && 'gameServiceStatus' in raw
+              ? raw
+              : raw?.settings || raw?.platformConfiguration || raw?.data || raw
           setForm((f) => ({
             ...f,
-            serviceControls: apiSettingsToForm(res.data.settings),
+            maintenanceMode: apiValueToBoolean(config.fullSystemStatus),
+            serviceControls: apiSettingsToForm(config),
           }))
           setSiteSettingsError(null)
         } else {
-          setSiteSettingsError(res?.message || 'Failed to load site settings')
+          setSiteSettingsError(res?.message || 'Failed to load platform configuration')
         }
       })
-      .catch(() => setSiteSettingsError('Failed to load site settings'))
+      .catch(() => setSiteSettingsError('Failed to load platform configuration'))
       .finally(() => setSiteSettingsLoading(false))
   }, [])
 
@@ -146,7 +187,7 @@ export default function Settings() {
     if (!canEdit) return
     setSaving(true)
     const payload = formServiceControlsToApi(form.serviceControls)
-    AuthService.patchMasterSiteSettings(payload)
+    AuthService.patchPlatformConfiguration(payload)
       .then((res) => {
         if (res?.success) {
           try {
@@ -161,12 +202,46 @@ export default function Settings() {
       .finally(() => setSaving(false))
   }
 
+  function toggleFullSystemMaintenance() {
+    if (!canEdit || togglingFullMaintenance) return
+    const nextValue = !form.maintenanceMode
+    setTogglingFullMaintenance(true)
+    AuthService.patchPlatformConfiguration({ fullSystemStatus: nextValue })
+      .then((res) => {
+        if (res?.success) {
+          setForm((f) => ({ ...f, maintenanceMode: nextValue }))
+          addToast(nextValue ? 'Full system maintenance enabled' : 'Full system maintenance disabled', 'success')
+        } else {
+          addToast(res?.message || 'Failed to update', 'error')
+        }
+      })
+      .catch(() => addToast('Failed to update', 'error'))
+      .finally(() => setTogglingFullMaintenance(false))
+  }
+
   function toggleService(key) {
-    if (!canEdit) return
+    if (!canEdit || togglingKey) return
+    const nextValue = !form.serviceControls?.[key]
     setForm((f) => ({
       ...f,
-      serviceControls: { ...f.serviceControls, [key]: !f.serviceControls?.[key] },
+      serviceControls: { ...f.serviceControls, [key]: nextValue },
     }))
+    setTogglingKey(key)
+    const payload = formServiceControlsToApi({ ...form.serviceControls, [key]: nextValue })
+    AuthService.patchPlatformConfiguration(payload)
+      .then((res) => {
+        if (res?.success) {
+          addToast(nextValue ? 'Service enabled' : 'Service disabled', 'success')
+        } else {
+          setForm((f) => ({ ...f, serviceControls: { ...f.serviceControls, [key]: !nextValue } }))
+          addToast(res?.message || 'Failed to update', 'error')
+        }
+      })
+      .catch(() => {
+        setForm((f) => ({ ...f, serviceControls: { ...f.serviceControls, [key]: !nextValue } }))
+        addToast('Failed to update', 'error')
+      })
+      .finally(() => setTogglingKey(null))
   }
 
   function handleSchedule(e) {
@@ -181,13 +256,64 @@ export default function Settings() {
     setScheduleDateTime('')
   }
 
+  function handleSaveLimits(e) {
+    e.preventDefault()
+    if (!canEdit) return
+    setLimitsSaving(true)
+    const limits = form.limits || defaultSettings.limits
+    const payload = {
+      minDepositLimit: Number(limits.minDepositFiat) || 0,
+      maxDepositLimit: Number(limits.maxDepositFiat) || 0,
+      bonusPercentage: Number(limits.bonusPercentage) || 0,
+      minWithdrawalLimit: Number(limits.minWithdrawalFiat) || 0,
+      maxWithdrawalLimit: Number(limits.maxWithdrawalFiatPerDay) || 0,
+    }
+    AuthService.patchMasterTransactionLimits(payload)
+      .then((res) => {
+        if (res?.success) {
+          try {
+            const saved = localStorage.getItem(STORAGE_KEY)
+            const parsed = saved ? JSON.parse(saved) : {}
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...parsed, limits: { ...defaultSettings.limits, ...form.limits } }))
+          } catch (_) {}
+          addToast(res?.message || 'Limits saved successfully', 'success')
+        } else {
+          addToast(res?.message || 'Failed to save limits', 'error')
+        }
+      })
+      .catch(() => addToast('Failed to save limits', 'error'))
+      .finally(() => setLimitsSaving(false))
+  }
+
   return (
     <div className="space-y-6">
       <PageBanner
-        title="Platform Configuration"
-        subtitle="Control availability of platform features: instant on/off or schedule future changes – PlayAdd / BetFury"
+        title="Settings"
+        subtitle="Platform configuration and app limits in separate tabs"
         icon={HiCog}
       />
+
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-gray-200">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-3 text-sm font-medium rounded-t-xl border-b-2 -mb-px transition-colors ${
+              activeTab === tab.id
+                ? 'border-teal-500 text-teal-600 bg-white border-gray-200'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab: Platform Configuration */}
+      {activeTab === 'platform' && (
+      <>
       <form onSubmit={handleSave} className="space-y-6">
         {/* Full System Maintenance card */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
@@ -203,10 +329,11 @@ export default function Settings() {
               type="button"
               role="switch"
               aria-checked={form.maintenanceMode}
-              onClick={() => canEdit && setForm((f) => ({ ...f, maintenanceMode: !f.maintenanceMode }))}
+              onClick={toggleFullSystemMaintenance}
+              disabled={!canEdit || togglingFullMaintenance}
               className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:cursor-not-allowed ${
                 form.maintenanceMode ? 'bg-teal-500' : 'bg-gray-200'
-              } ${!canEdit ? 'opacity-60' : ''}`}
+              } ${!canEdit ? 'opacity-60' : ''} ${togglingFullMaintenance ? 'opacity-70' : ''}`}
             >
               <span
                 className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
@@ -217,15 +344,15 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Service Controls (Instant On/Off) card – GET/PATCH /api/v1/master/site-settings */}
+        {/* Service Controls (Instant On/Off) – GET/PATCH /api/v1/master/platform-configuration */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">Service Controls (Instant On/Off)</h2>
-          <p className="text-sm text-gray-500 mt-0.5 mb-2">Enable or disable platform functions. Click Save to apply changes.</p>
+          <p className="text-sm text-gray-500 mt-0.5 mb-2">Enable or disable platform functions. Changes apply immediately.</p>
           {siteSettingsError && (
             <p className="text-sm text-red-600 mb-4">{siteSettingsError}</p>
           )}
           {siteSettingsLoading ? (
-            <p className="text-sm text-gray-500 py-4">Loading site settings…</p>
+            <p className="text-sm text-gray-500 py-4">Loading platform configuration…</p>
           ) : (
             <ul className="space-y-4">
               {SERVICE_CONTROLS.map(({ key, label, description, icon: Icon }) => (
@@ -242,10 +369,10 @@ export default function Settings() {
                     role="switch"
                     aria-checked={form.serviceControls?.[key]}
                     onClick={() => toggleService(key)}
-                    disabled={!canEdit}
+                    disabled={!canEdit || togglingKey !== null}
                     className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:cursor-not-allowed ${
                       form.serviceControls?.[key] ? 'bg-teal-500' : 'bg-gray-200'
-                    } ${!canEdit ? 'opacity-60' : ''}`}
+                    } ${!canEdit ? 'opacity-60' : ''} ${togglingKey === key ? 'opacity-70' : ''}`}
                   >
                     <span
                       className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
@@ -334,6 +461,101 @@ export default function Settings() {
           </button>
         </form>
       </div>
+      </>
+      )}
+
+      {/* Tab: Settings (limits & bonus) */}
+      {activeTab === 'settings' && (
+      <form onSubmit={handleSaveLimits} className="space-y-6">
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0 text-emerald-600">
+              <HiCash className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Deposit & bonus limits</h2>
+              <p className="text-sm text-gray-500 mt-0.5">Set minimum and maximum deposit limits, withdrawal limits, and bonus percentage.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Minimum deposit limit (₹)</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={form.limits?.minDepositFiat ?? defaultSettings.limits.minDepositFiat}
+                onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, minDepositFiat: Number(e.target.value) || 0 } }))}
+                disabled={!canEdit}
+                className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Maximum deposit limit (₹)</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={form.limits?.maxDepositFiat ?? defaultSettings.limits.maxDepositFiat}
+                onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, maxDepositFiat: Number(e.target.value) || 0 } }))}
+                disabled={!canEdit}
+                className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Bonus percentage (%)</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={form.limits?.bonusPercentage ?? defaultSettings.limits.bonusPercentage}
+                onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, bonusPercentage: Number(e.target.value) || 0 } }))}
+                disabled={!canEdit}
+                className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Minimum withdrawal limit (₹)</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={form.limits?.minWithdrawalFiat ?? defaultSettings.limits.minWithdrawalFiat}
+                onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, minWithdrawalFiat: Number(e.target.value) || 0 } }))}
+                disabled={!canEdit}
+                className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Maximum withdrawal Limit (₹)</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={form.limits?.maxWithdrawalFiatPerDay ?? defaultSettings.limits.maxWithdrawalFiatPerDay}
+                onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, maxWithdrawalFiatPerDay: Number(e.target.value) || 0 } }))}
+                disabled={!canEdit}
+                className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
+              />
+            </div>
+          </div>
+          <div className="flex justify-center pt-4">
+            <button
+              type="submit"
+              disabled={!canEdit || limitsSaving}
+              className="flex items-center justify-center gap-2 w-full max-w-md px-6 py-3.5 rounded-xl bg-teal-500 text-white font-semibold hover:bg-teal-600 focus:ring-2 focus:ring-teal-500/50 focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <HiSave className="w-5 h-5" />
+              {limitsSaving ? 'Saving…' : 'Save limits'}
+            </button>
+          </div>
+          {!canEdit && (
+            <p className="text-center text-gray-500 text-sm mt-2">You need edit permission to change settings.</p>
+          )}
+        </div>
+      </form>
+      )}
     </div>
   )
 }

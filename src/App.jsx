@@ -26,7 +26,9 @@ import Profile from './pages/Profile'
 import SubAdminManagement from './pages/SubAdminManagement'
 import UserDetails from './pages/UserDetails'
 import Bets from './pages/Bets'
+import CasinoHistory from './pages/CasinoHistory'
 import AccountSettlement from './pages/AccountSettlement'
+import DepositAccounts from './pages/DepositAccounts'
 
 class ErrorBoundary extends Component {
   state = { hasError: false, error: null }
@@ -78,6 +80,7 @@ export default function App() {
                 <Route path="wallets" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_WALLETS}><Wallets /></ProtectedRoute>} />
                 <Route path="games" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_GAMES}><Games /></ProtectedRoute>} />
                 <Route path="bets" element={<ProtectedRoute requiredPermission={PERMISSIONS.MANAGE_BETTING}><Bets /></ProtectedRoute>} />
+                <Route path="casino-history" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_CASINO_HISTORY}><CasinoHistory /></ProtectedRoute>} />
                 <Route path="deposits" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_DEPOSITS}><Deposits /></ProtectedRoute>} />
                 <Route path="withdrawals" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_WITHDRAWALS}><Withdrawals /></ProtectedRoute>} />
                 <Route path="transactions" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_TRANSACTIONS}><Transactions /></ProtectedRoute>} />
@@ -90,6 +93,7 @@ export default function App() {
                 <Route path="support" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_TICKETS}><Support /></ProtectedRoute>} />
                 <Route path="notifications" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_NOTIFICATIONS}><Notifications /></ProtectedRoute>} />
                 <Route path="audit-logs" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_AUDIT_LOG}><AuditLogs /></ProtectedRoute>} />
+                <Route path="deposit-accounts" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_DEPOSITS}><DepositAccounts /></ProtectedRoute>} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="settings" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_SETTINGS}><Settings /></ProtectedRoute>} />
               </Route>

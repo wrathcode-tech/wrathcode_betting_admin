@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { HiChartBar, HiUsers, HiUser, HiCash, HiCollection, HiArrowUp, HiArrowDown, HiCurrencyDollar, HiGift, HiUserGroup, HiShieldExclamation, HiDocumentText, HiSupport, HiBell, HiClipboardList, HiCog, HiSearch } from 'react-icons/hi'
+import { HiChartBar, HiUsers, HiUser, HiCash, HiCreditCard, HiCollection, HiArrowUp, HiArrowDown, HiCurrencyDollar, HiGift, HiUserGroup, HiShieldExclamation, HiDocumentText, HiSupport, HiBell, HiClipboardList, HiCog, HiSearch } from 'react-icons/hi'
 import { useLayout } from '../context/LayoutContext'
 import { useAuth } from '../context/AuthContext'
 import { PERMISSIONS } from '../constants/roles'
@@ -12,6 +12,7 @@ const allCommands = [
   { path: '/wallets', label: 'Wallets', icon: HiCash, keywords: 'wallets balance fiat', permission: PERMISSIONS.VIEW_WALLETS },
   { path: '/games', label: 'Games', icon: HiCollection, keywords: 'games teen patti rummy', permission: PERMISSIONS.VIEW_GAMES },
   { path: '/deposits', label: 'Deposits', icon: HiArrowDown, keywords: 'deposits', permission: PERMISSIONS.VIEW_DEPOSITS },
+  { path: '/deposit-accounts', label: 'Deposit Accounts', icon: HiCreditCard, keywords: 'deposit accounts bank upi', permission: PERMISSIONS.VIEW_DEPOSITS },
   { path: '/withdrawals', label: 'Withdrawals', icon: HiArrowUp, keywords: 'withdrawals payout', permission: PERMISSIONS.VIEW_WITHDRAWALS },
   { path: '/transactions', label: 'Transactions', icon: HiCurrencyDollar, keywords: 'transactions', permission: PERMISSIONS.VIEW_TRANSACTIONS },
   { path: '/bonuses', label: 'Bonuses', icon: HiGift, keywords: 'bonuses promo', permission: PERMISSIONS.VIEW_BONUSES },

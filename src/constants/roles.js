@@ -36,6 +36,7 @@ export const PERMISSIONS = {
   VIEW_GAMES: 'view_games',
   EDIT_GAMES: 'edit_games',
   MANAGE_BETTING: 'manage_betting',
+  VIEW_CASINO_HISTORY: 'view_casino_history',
 
   // Bonuses & referrals
   VIEW_BONUSES: 'view_bonuses',

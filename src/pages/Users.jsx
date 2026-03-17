@@ -11,6 +11,10 @@ import {
   HiRefresh,
   HiEye,
   HiLockClosed,
+  HiLockOpen,
+  HiPause,
+  HiPlay,
+  HiTrash,
   HiChevronLeft,
   HiChevronRight as HiNext,
 } from 'react-icons/hi'
@@ -35,17 +39,43 @@ function formatCreatedAt(iso) {
   return `${day}/${month}/${year}, ${String(h).padStart(2, '0')}:${m} ${ampm}`
 }
 
-const statusVariant = (s) => (s === 'active' ? 'success' : s === 'banned' ? 'error' : s === 'pending' ? 'warning' : 'neutral')
+/** Badge color by status: Active=green, Pending=amber, Suspended=blue, Frozen=amber, Banned=red, else=gray */
+const statusVariant = (s) => {
+  const n = normalizedStatus(s)
+  if (n === 'active') return 'success'
+  if (n === 'pending') return 'warning'
+  if (n === 'suspended') return 'info'
+  if (n === 'frozen' || n === 'freezed') return 'warning'
+  if (n === 'banned') return 'error'
+  return 'neutral'
+}
+/** Normalized status (lowercase) for consistent checks – API may return "Suspended" or "suspended" */
+const normalizedStatus = (s) => String(s ?? '').toLowerCase().trim()
+const isFrozenStatus = (s) => ['suspended', 'frozen', 'freezed'].includes(normalizedStatus(s))
+/** Open lock only when status is frozen/freezed (not suspended) */
+const isFreezedStatus = (s) => ['frozen', 'freezed'].includes(normalizedStatus(s))
+const isSuspendedStatus = (s) => normalizedStatus(s) === 'suspended'
+/** Display label for Status column: Suspended vs Frozen vs raw */
+const statusLabel = (s) => {
+  const n = normalizedStatus(s)
+  if (n === 'active') return 'Active'
+  if (n === 'pending') return 'Pending'
+  if (n === 'suspended') return 'Suspended'
+  if (n === 'frozen' || n === 'freezed') return 'Frozen'
+  return s || '–'
+}
 
 /** Normalize API user to include id and status for table/actions */
 function normalizeUser(u) {
   if (!u) return u
+  const mobile = u.mobile ?? u.mobileNumber
+  const rawStatus = u.accountStatus ?? u.status
   return {
     ...u,
     id: u._id ?? u.id,
     name: u.fullName ?? u.name,
-    phone: u.mobile ? (u.countryCode ? `${u.countryCode} ${u.mobile}` : u.mobile) : undefined,
-    status: u.accountStatus ?? u.status,
+    phone: mobile ? (u.countryCode ? `${u.countryCode} ${mobile}` : mobile) : undefined,
+    status: rawStatus != null ? String(rawStatus).toLowerCase().trim() : '',
   }
 }
 
@@ -111,8 +141,18 @@ export default function Users() {
 
   const handleFreeze = () => {
     if (!confirmAction) return
+    const userId = confirmAction.id
     setConfirmAction(null)
-    addToast('Freeze user API not implemented', 'error')
+    AuthService.patchMasterUserFreeze(userId)
+      .then((res) => {
+        if (res?.success && res?.data?.user) {
+          addToast(res.message || 'User account frozen successfully', 'success')
+          setUsers((prev) => prev.map((u) => (u.id === userId ? normalizeUser(res.data.user) : u)))
+        } else {
+          addToast(res?.message || 'Failed to freeze user', 'error')
+        }
+      })
+      .catch(() => addToast('Failed to freeze user', 'error'))
   }
 
   const handleBan = () => {
@@ -123,13 +163,85 @@ export default function Users() {
 
   const handleActivate = () => {
     if (!confirmAction) return
+    const userId = confirmAction.id
     setConfirmAction(null)
-    addToast('Activate user API not implemented', 'error')
+    AuthService.patchMasterUserUnfreeze(userId)
+      .then((res) => {
+        if (res?.success && res?.data?.user) {
+          addToast(res.message || 'User account unfrozen successfully', 'success')
+          setUsers((prev) => prev.map((u) => (u.id === userId ? normalizeUser(res.data.user) : u)))
+        } else if (res?.success) {
+          addToast(res.message || 'User account unfrozen successfully', 'success')
+          fetchUsers()
+        } else {
+          addToast(res?.message || 'Failed to unfreeze user', 'error')
+        }
+      })
+      .catch(() => addToast('Failed to unfreeze user', 'error'))
+  }
+
+  const handleSuspend = () => {
+    if (!confirmAction) return
+    const userId = confirmAction.id
+    setConfirmAction(null)
+    AuthService.patchMasterUserSuspend(userId)
+      .then((res) => {
+        if (res?.success) {
+          addToast(res.message || 'User account suspended successfully', 'success')
+          if (res?.data?.user) {
+            const updated = normalizeUser(res.data.user)
+            if (!isFrozenStatus(updated.status)) updated.status = 'suspended'
+            setUsers((prev) => prev.map((u) => (u.id === userId ? updated : u)))
+          } else {
+            // Update row so lock shows open (Unfreeze/Activate) when API doesn't return user
+            setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, status: 'suspended' } : u)))
+          }
+        } else {
+          addToast(res?.message || 'Failed to suspend user', 'error')
+        }
+      })
+      .catch(() => addToast('Failed to suspend user', 'error'))
+  }
+
+  const handleUnsuspend = () => {
+    if (!confirmAction) return
+    const userId = confirmAction.id
+    setConfirmAction(null)
+    AuthService.patchMasterUserReactivate(userId)
+      .then((res) => {
+        if (res?.success) {
+          addToast(res.message || 'User account reactivated successfully', 'success')
+          if (res?.data?.user) {
+            setUsers((prev) => prev.map((u) => (u.id === userId ? normalizeUser(res.data.user) : u)))
+          } else {
+            setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, status: 'active' } : u)))
+          }
+        } else {
+          addToast(res?.message || 'Failed to reactivate user', 'error')
+        }
+      })
+      .catch(() => addToast('Failed to reactivate user', 'error'))
+  }
+
+  const handleDelete = () => {
+    if (!confirmAction) return
+    const userId = confirmAction.id
+    setConfirmAction(null)
+    AuthService.deleteMasterUser(userId)
+      .then((res) => {
+        if (res?.success) {
+          addToast(res.message || 'User deleted successfully', 'success')
+          setUsers((prev) => prev.filter((u) => u.id !== userId))
+        } else {
+          addToast(res?.message || 'Failed to delete user', 'error')
+        }
+      })
+      .catch(() => addToast('Failed to delete user', 'error'))
   }
 
   const handleRefresh = () => {
     fetchUsers()
-    addToast('List refreshed', 'success')
+    // addToast('List refreshed', 'success')
   }
 
   const handleReset = () => {
@@ -141,7 +253,7 @@ export default function Users() {
 
   return (
     <div className="space-y-0">
-      <PageBanner title="User List" subtitle="View and manage registered users – PlayAdd / BetFury" icon={HiUser} />
+      <PageBanner title="User List" subtitle="View and manage registered users" icon={HiUser} />
 
       {/* Card header: User List + total */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-6">
@@ -207,33 +319,33 @@ export default function Users() {
           <table className="w-full min-w-[900px]">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Mobile</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-14">Sr No.</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Registered Date & Time</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">User ID</th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">UUID</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Mobile</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Referral Code</th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Created</th>
                 <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-gray-500">
+                  <td colSpan={9} className="py-12 text-center text-gray-500">
                     Loading users…
                   </td>
                 </tr>
               ) : (
-                users.map((u) => (
+                users.map((u, idx) => (
                   <tr
                     key={u.id}
                     className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
                     onClick={() => goToUser(u)}
                   >
-                    <td className="py-3 px-4 text-gray-900 text-sm">{u.email || '–'}</td>
-                    <td className="py-3 px-4 text-gray-600 text-sm">{u.phone || u.mobile || '–'}</td>
-                    <td className="py-3 px-4 text-gray-900 text-sm">{u.name || u.fullName || '–'}</td>
+                    <td className="py-3 px-4 text-gray-600 text-sm font-medium">{(page - 1) * perPage + idx + 1}</td>
+                    <td className="py-3 px-4 text-gray-500 text-sm">{formatCreatedAt(u.createdAt)}</td>
                     <td className="py-3 px-4">
                       <button
                         type="button"
@@ -243,11 +355,14 @@ export default function Users() {
                         {u.uuid || u.id}
                       </button>
                     </td>
+                    <td className="py-3 px-4 text-gray-900 text-sm">{u.name || u.fullName || '–'}</td>
+                    <td className="py-3 px-4 text-gray-600 text-sm">{u.phone || u.mobile || '–'}</td>
+                    <td className="py-3 px-4 text-gray-900 text-sm">{u.email || '–'}</td>
+                    
                     <td className="py-3 px-4">
-                      <Badge variant={statusVariant(u.status)}>{u.status === 'active' ? 'Active' : u.status === 'pending' ? 'Pending' : u.status || '–'}</Badge>
+                      <Badge variant={statusVariant(u.status)}>{statusLabel(u.status)}</Badge>
                     </td>
                     <td className="py-3 px-4 text-gray-600 text-sm font-mono">{u.referralCode || '–'}</td>
-                    <td className="py-3 px-4 text-gray-500 text-sm">{formatCreatedAt(u.createdAt)}</td>
                     <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         <button
@@ -259,17 +374,49 @@ export default function Users() {
                           <HiEye className="w-5 h-5" />
                         </button>
                         {canManageUserAccounts && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (u.status === 'active') setConfirmAction({ id: u.id, action: 'freeze', name: u.name || u.fullName })
-                              else setConfirmAction({ id: u.id, action: 'activate', name: u.name || u.fullName })
-                            }}
-                            className="p-2 rounded-lg text-teal-600 hover:bg-teal-50 transition-colors"
-                            title={u.status === 'active' ? 'Lock / Freeze' : 'Activate'}
-                          >
-                            <HiLockClosed className="w-5 h-5" />
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              disabled={isSuspendedStatus(u.status)}
+                              onClick={() => {
+                                if (isSuspendedStatus(u.status)) return
+                                if (u.status === 'active') setConfirmAction({ id: u.id, action: 'freeze', name: u.name || u.fullName })
+                                else setConfirmAction({ id: u.id, action: 'activate', name: u.name || u.fullName })
+                              }}
+                              className="p-2 rounded-lg text-teal-600 hover:bg-teal-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                              title={isSuspendedStatus(u.status) ? 'Lock unavailable for suspended users – use Unsuspend to reactivate' : isFreezedStatus(u.status) ? 'Unfreeze / Activate' : u.status === 'active' ? 'Lock / Freeze' : 'Freeze'}
+                            >
+                              {isFreezedStatus(u.status) ? (
+                                <HiLockOpen className="w-5 h-5" />
+                              ) : (
+                                <HiLockClosed className="w-5 h-5" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (isSuspendedStatus(u.status)) setConfirmAction({ id: u.id, action: 'unsuspend', name: u.name || u.fullName })
+                                else setConfirmAction({ id: u.id, action: 'suspend', name: u.name || u.fullName })
+                              }}
+                              className={isSuspendedStatus(u.status) ? 'p-2 rounded-lg text-green-600 hover:bg-green-50 transition-colors' : 'p-2 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors'}
+                              title={isSuspendedStatus(u.status) ? 'Unsuspend / Reactivate account' : 'Suspend account'}
+                            >
+                              {isSuspendedStatus(u.status) ? (
+                                <HiPlay className="w-5 h-5" />
+                              ) : (
+                                <HiPause className="w-5 h-5" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setConfirmAction({ id: u.id, action: 'delete', name: u.name || u.fullName }); }}
+                              className="p-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                              title="Delete user"
+                            >
+                              <HiTrash className="w-5 h-5" />
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -309,7 +456,10 @@ export default function Users() {
       </div>
 
       <ConfirmDialog open={!!confirmAction && confirmAction.action === 'freeze'} title="Freeze user?" message={confirmAction ? `Freeze "${confirmAction.name}"?` : ''} confirmLabel="Freeze" onConfirm={handleFreeze} onCancel={() => setConfirmAction(null)} />
-      <ConfirmDialog open={!!confirmAction && confirmAction.action === 'activate'} title="Activate user?" message={confirmAction ? `Activate "${confirmAction.name}"?` : ''} confirmLabel="Activate" onConfirm={handleActivate} onCancel={() => setConfirmAction(null)} />
+      <ConfirmDialog open={!!confirmAction && confirmAction.action === 'activate'} title="Unfreeze user?" message={confirmAction ? `Unfreeze "${confirmAction.name}"?` : ''} confirmLabel="Unfreeze" onConfirm={handleActivate} onCancel={() => setConfirmAction(null)} />
+      <ConfirmDialog open={!!confirmAction && confirmAction.action === 'suspend'} title="Suspend account?" message={confirmAction ? `Suspend "${confirmAction.name}"? They will not be able to use their account.` : ''} confirmLabel="Suspend" onConfirm={handleSuspend} onCancel={() => setConfirmAction(null)} />
+      <ConfirmDialog open={!!confirmAction && confirmAction.action === 'unsuspend'} title="Unsuspend / Reactivate account?" message={confirmAction ? `Reactivate "${confirmAction.name}"? They will be able to use their account again.` : ''} confirmLabel="Reactivate" onConfirm={handleUnsuspend} onCancel={() => setConfirmAction(null)} />
+      <ConfirmDialog open={!!confirmAction && confirmAction.action === 'delete'} title="Delete user?" message={confirmAction ? `Permanently delete "${confirmAction.name}"? This cannot be undone.` : ''} confirmLabel="Delete" danger onConfirm={handleDelete} onCancel={() => setConfirmAction(null)} />
       <ConfirmDialog open={!!confirmAction && confirmAction.action === 'ban'} title="Ban user?" message={confirmAction ? `Ban "${confirmAction.name}"? They will not be able to log in.` : ''} confirmLabel="Ban" danger onConfirm={handleBan} onCancel={() => setConfirmAction(null)} />
     </div>
   )

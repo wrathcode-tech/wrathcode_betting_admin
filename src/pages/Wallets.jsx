@@ -46,6 +46,7 @@ export default function Wallets() {
   const [adjustOpen, setAdjustOpen] = useState(false)
   const [selectedWallet, setSelectedWallet] = useState(null)
   const [adjustForm, setAdjustForm] = useState({ type: 'credit', amount: '', reason: '' })
+  const [adjustLoading, setAdjustLoading] = useState(false)
   const { addToast } = useToast()
   const { hasPermission, getSubAdminCapabilities } = useAuth()
   const caps = getSubAdminCapabilities()
@@ -104,15 +105,43 @@ export default function Wallets() {
     setAdjustOpen(true)
   }
 
+  function getWalletUserId(w) {
+    if (!w) return null
+    return w.userId ?? w.user?._id ?? w._id
+  }
+
   function handleAdjust(e) {
     e.preventDefault()
-    if (!selectedWallet || !adjustForm.amount || Number(adjustForm.amount) <= 0) {
-      addToast('Enter a valid amount', 'error')
+    const userId = getWalletUserId(selectedWallet)
+    if (!userId) {
+      addToast('User ID not found for this wallet', 'error')
       return
     }
-    addToast('Adjust balance API not implemented', 'error')
-    setAdjustOpen(false)
-    setSelectedWallet(null)
+    const amount = Number(adjustForm.amount)
+    if (!adjustForm.amount || isNaN(amount) || amount < 1) {
+      addToast('Enter a valid amount (minimum 1)', 'error')
+      return
+    }
+    setAdjustLoading(true)
+    const payload = {
+      type: adjustForm.type,
+      amount: Math.floor(amount),
+      ...(adjustForm.reason?.trim() && { description: adjustForm.reason.trim().slice(0, 500) }),
+    }
+    AuthService.postMasterUserWalletAdjust(userId, payload)
+      .then((res) => {
+        if (res?.success) {
+          addToast(res.message || 'Wallet balance updated', 'success')
+          setAdjustOpen(false)
+          setSelectedWallet(null)
+          setAdjustForm({ type: 'credit', amount: '', reason: '' })
+          fetchWallets()
+        } else {
+          addToast(res?.message || 'Failed to adjust balance', 'error')
+        }
+      })
+      .catch(() => addToast('Failed to adjust balance', 'error'))
+      .finally(() => setAdjustLoading(false))
   }
 
   function handleReset() {
@@ -136,7 +165,7 @@ export default function Wallets() {
               <HiCash className="w-5 h-5 text-teal-600" />
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Balance (page)</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Balance</p>
               <p className="text-lg font-bold text-gray-900">{formatInr(stats.totalBalance)}</p>
             </div>
           </div>
@@ -158,7 +187,7 @@ export default function Wallets() {
               <HiCash className="w-5 h-5 text-emerald-600" />
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">With Balance (page)</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">With Balance</p>
               <p className="text-lg font-bold text-gray-900">{stats.activeWallets}</p>
             </div>
           </div>
@@ -249,8 +278,8 @@ export default function Wallets() {
                   </td>
                 </tr>
               ) : (
-                wallets.map((w) => (
-                  <tr key={w.userId} className="border-b border-gray-100 hover:bg-gray-50">
+                [...wallets].reverse().map((w) => (
+                  <tr key={w.userId ?? w._id ?? w.user?._id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-600 font-semibold text-sm">
@@ -324,8 +353,8 @@ export default function Wallets() {
       {/* Adjust balance modal */}
       <Modal
         open={adjustOpen}
-        onClose={() => { setAdjustOpen(false); setSelectedWallet(null); }}
-        title={selectedWallet ? `Adjust balance – ${selectedWallet.fullName}` : 'Adjust balance'}
+        onClose={() => { if (!adjustLoading) { setAdjustOpen(false); setSelectedWallet(null); } }}
+        title={selectedWallet ? `Adjust balance – ${selectedWallet.fullName || selectedWallet.email || 'User'}` : 'Adjust balance'}
         size="md"
       >
         {selectedWallet && (
@@ -340,46 +369,52 @@ export default function Wallets() {
                 value={adjustForm.type}
                 onChange={(e) => setAdjustForm((f) => ({ ...f, type: e.target.value }))}
                 className={inputClass}
+                disabled={adjustLoading}
               >
                 <option value="credit">Credit</option>
                 <option value="debit">Debit</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Amount (INR)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Amount (INR, min 1)</label>
               <input
                 type="number"
-                step="any"
-                min="0"
+                step="1"
+                min="1"
                 value={adjustForm.amount}
                 onChange={(e) => setAdjustForm((f) => ({ ...f, amount: e.target.value }))}
                 className={inputClass}
                 placeholder="0"
+                disabled={adjustLoading}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Reason (optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Description (optional, max 500 chars)</label>
               <input
                 type="text"
+                maxLength={500}
                 value={adjustForm.reason}
                 onChange={(e) => setAdjustForm((f) => ({ ...f, reason: e.target.value }))}
                 className={inputClass}
-                placeholder="e.g. Bonus, correction"
+                placeholder="e.g. Bonus correction, Refund reversal"
+                disabled={adjustLoading}
               />
             </div>
             <div className="flex gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => { setAdjustOpen(false); setSelectedWallet(null); }}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-gray-200 text-gray-700 font-medium hover:bg-gray-300"
+                disabled={adjustLoading}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="flex-1 px-4 py-2.5 rounded-xl bg-teal-500 text-white font-semibold hover:bg-teal-600"
+                disabled={adjustLoading}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-teal-500 text-white font-semibold hover:bg-teal-600 disabled:opacity-50"
               >
-                Apply
+                {adjustLoading ? 'Applying…' : 'Apply'}
               </button>
             </div>
           </form>

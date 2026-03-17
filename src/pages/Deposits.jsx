@@ -283,8 +283,8 @@ export default function Deposits() {
           <table className="w-full min-w-[900px]">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">ID</th>
-                <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">User</th>
+                <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Transaction ID</th>
+                <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">User ID</th>
                 <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Amount</th>
                 <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Status</th>
                 <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">UTR</th>
@@ -320,72 +320,80 @@ export default function Deposits() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((d) => (
-                  <tr key={d._id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-4 px-5 text-teal-600 font-mono text-sm truncate max-w-[120px]" title={d._id}>{d._id}</td>
-                    <td className="py-4 px-5 text-gray-900 text-sm">{userLabel(d)}</td>
-                    <td className="py-4 px-5 font-medium text-emerald-600">₹{Number(d.amount ?? 0).toLocaleString()}</td>
-                    <td className="py-4 px-5">
-                      <Badge variant={badgeVariant(d.status)}>{statusLabel(d.status)}</Badge>
-                    </td>
-                    <td className="py-4 px-5 text-gray-600 font-mono text-sm">{d.utrNumber || '–'}</td>
-                    <td className="py-4 px-5">
-                      {d.paymentProofUrl ? (
-                        <span className="inline-flex items-center gap-1">
-                          <img
-                            src={d.paymentProofUrl}
-                            alt="Payment proof"
-                            className="h-12 w-12 rounded-lg object-cover border border-gray-200 bg-gray-50 shrink-0"
-                            onError={(e) => {
-                              e.target.onerror = null
-                              e.target.style.display = 'none'
-                              const fallback = e.target.parentElement?.querySelector('.proof-fallback')
-                              if (fallback) fallback.classList.remove('hidden')
-                            }}
-                          />
-                          <span className="proof-fallback hidden text-gray-400 text-xs">Failed to load</span>
-                        </span>
-                      ) : (
-                        '–'
-                      )}
-                    </td>
-                    <td className="py-4 px-5 text-gray-600 text-sm max-w-[150px] truncate" title={d.remarks}>{d.remarks || '–'}</td>
-                    <td className="py-4 px-5 text-gray-500 text-sm">
-                      {d.processedAt ? formatDateTime(d.processedAt) : '–'}
-                      {d.processedBy && <span className="block text-xs text-gray-400">{d.processedBy}</span>}
-                    </td>
-                    <td className="py-4 px-5 text-gray-500 text-sm">{formatDateTime(d.createdAt)}</td>
-                    {(activeTab === 'all' || activeTab === 'pending') && (
-                      <td className="py-4 px-5 text-right">
-                        {d.status === 'pending' ? (
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              disabled={actionLoading}
-                              onClick={() => handleApprove(d)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              <HiCheck className="w-4 h-4" /> Approve
-                            </button>
-                            <button
-                              type="button"
-                              disabled={actionLoading}
-                              onClick={() => handleRejectClick(d)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              <HiX className="w-4 h-4" /> Reject
-                            </button>
-                          </div>
+                filtered.map((d) => {
+                  const u = d.userId
+                  return (
+                    <tr key={d._id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-4 px-5 text-teal-600 font-mono text-sm truncate max-w-[120px]" title={d.transactionId
+  }>{d.transactionId
+  }</td>
+                      <td className="py-4 px-5 text-gray-900 text-sm">
+                      {u?.uuid && <p className="font-medium">{u.uuid}</p>}
+                        <p className="text-gray-500 font-mono text-xs mt-0.5">({u?.mobile || u?.email || u?.fullName || '–'})</p>
+                      </td>
+                      <td className="py-4 px-5 font-medium text-emerald-600">₹{Number(d.amount ?? 0).toLocaleString()}</td>
+                      <td className="py-4 px-5">
+                        <Badge variant={badgeVariant(d.status)}>{statusLabel(d.status)}</Badge>
+                      </td>
+                      <td className="py-4 px-5 text-gray-600 font-mono text-sm">{d.utrNumber || '–'}</td>
+                      <td className="py-4 px-5">
+                        {d.paymentProofUrl ? (
+                          <span className="inline-flex items-center gap-1">
+                            <img
+                              src={d.paymentProofUrl}
+                              alt="Payment proof"
+                              className="h-12 w-12 rounded-lg object-cover border border-gray-200 bg-gray-50 shrink-0"
+                              onError={(e) => {
+                                e.target.onerror = null
+                                e.target.style.display = 'none'
+                                const fallback = e.target.parentElement?.querySelector('.proof-fallback')
+                                if (fallback) fallback.classList.remove('hidden')
+                              }}
+                            />
+                            <span className="proof-fallback hidden text-gray-400 text-xs">Failed to load</span>
+                          </span>
                         ) : (
-                          <span className="text-gray-400 text-sm">–</span>
+                          '–'
                         )}
                       </td>
-                    )}
-                    {activeTab === 'rejected' && (
-                      <td className="py-4 px-5 text-gray-600 text-sm max-w-[200px] truncate" title={d.adminRemarks}>{d.adminRemarks || '–'}</td>
-                    )}
-                  </tr>
-                ))
+                      <td className="py-4 px-5 text-gray-600 text-sm max-w-[150px] truncate" title={d.remarks}>{d.remarks || '–'}</td>
+                      <td className="py-4 px-5 text-gray-500 text-sm">
+                        {d.processedAt ? formatDateTime(d.processedAt) : '–'}
+                        {d.processedBy && <span className="block text-xs text-gray-400">{d.processedBy}</span>}
+                      </td>
+                      <td className="py-4 px-5 text-gray-500 text-sm">{formatDateTime(d.createdAt)}</td>
+                      {(activeTab === 'all' || activeTab === 'pending') && (
+                        <td className="py-4 px-5 text-right">
+                          {d.status === 'pending' ? (
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                disabled={actionLoading}
+                                onClick={() => handleApprove(d)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <HiCheck className="w-4 h-4" /> Approve
+                              </button>
+                              <button
+                                type="button"
+                                disabled={actionLoading}
+                                onClick={() => handleRejectClick(d)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <HiX className="w-4 h-4" /> Reject
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-sm">–</span>
+                          )}
+                        </td>
+                      )}
+                      {activeTab === 'rejected' && (
+                        <td className="py-4 px-5 text-gray-600 text-sm max-w-[200px] truncate" title={d.adminRemarks}>{d.adminRemarks || '–'}</td>
+                      )}
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

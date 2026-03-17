@@ -63,7 +63,7 @@ export default function RiskFraud() {
 
   return (
     <div className="space-y-6">
-      <PageBanner title="Risk & Fraud" subtitle="Alerts, rules, and fraud detection – PlayAdd / BetFury" icon={HiShieldExclamation} />
+      <PageBanner title="Risk & Fraud" subtitle="Alerts, rules, and fraud detection" icon={HiShieldExclamation} />
       {canManageRules && (
         <div className="flex justify-end">
           <button type="button" onClick={() => setRulesOpen(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-gray-700 hover:border-teal-500/50 hover:text-teal-600 transition-colors">

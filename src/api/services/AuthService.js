@@ -56,6 +56,26 @@ const AuthService = {
     return ApiCallPatch(url, { settings }, headers);
   },
 
+  /** GET /api/v1/master/platform-configuration → { success, data: { gameServiceStatus, inPlayServiceStatus, ... } } */
+  getPlatformConfiguration: async () => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterPlatformConfiguration } = ApiConfig;
+    const url = `${baseUrl}${masterPlatformConfiguration}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** PATCH /api/v1/master/platform-configuration body: { gameServiceStatus?, inPlayServiceStatus?, ... } (min 1 key, all boolean) */
+  patchPlatformConfiguration: async (payload) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterPlatformConfiguration } = ApiConfig;
+    const url = `${baseUrl}${masterPlatformConfiguration}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPatch(url, payload, headers);
+  },
+
   /** GET /api/v1/master/users?page=1&limit=10&search=...&accountStatus=...&isActive=... → { success, data: { users, pagination } } */
   getMasterUsers: async (params = {}) => {
     const token = sessionStorage.getItem("token");
@@ -73,6 +93,34 @@ const AuthService = {
     return ApiCallGet(url, headers);
   },
 
+  /** GET /api/v1/master/users/referral-stats?page=1&limit=20 → { success, data: { users, pagination } } */
+  getMasterUsersReferralStats: async (params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterUsers } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.page != null) q.set("page", params.page);
+    if (params.limit != null) q.set("limit", Math.min(100, Math.max(1, params.limit)));
+    const query = q.toString();
+    const url = `${baseUrl}${masterUsers}/referral-stats${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/master/users/unassigned?page=1&limit=20 → { success, message, data: { users, pagination } } */
+  getMasterUnassignedUsers: async (params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterUsers } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.page != null) q.set("page", params.page);
+    if (params.limit != null) q.set("limit", Math.min(500, Math.max(1, params.limit)));
+    const query = q.toString();
+    const url = `${baseUrl}${masterUsers}/unassigned${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
   /** GET /api/v1/master/users/:userId → { success, data: { user } or user } */
   getMasterUserById: async (userId) => {
     const token = sessionStorage.getItem("token");
@@ -83,6 +131,110 @@ const AuthService = {
     return ApiCallGet(url, headers);
   },
 
+  /** GET /api/v1/master/users/:userId/referral-stats → { success, data: { referralCode, referredCount, totalCommission } } */
+  getMasterUserReferralStats: async (userId) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterUsers } = ApiConfig;
+    const url = `${baseUrl}${masterUsers}/${encodeURIComponent(userId)}/referral-stats`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/master/users/:userId/support-tickets?page=1&limit=20 → { success, data: { tickets, pagination } } */
+  getMasterUserSupportTickets: async (userId, params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterUsers } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.page != null) q.set("page", params.page);
+    if (params.limit != null) q.set("limit", Math.min(100, Math.max(1, params.limit)));
+    const query = q.toString();
+    const url = `${baseUrl}${masterUsers}/${encodeURIComponent(userId)}/support-tickets${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** PATCH /api/v1/master/users/:userId/freeze → { success, message, data: { user, message } } */
+  patchMasterUserFreeze: async (userId) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterUsers } = ApiConfig;
+    const url = `${baseUrl}${masterUsers}/${encodeURIComponent(userId)}/freeze`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPatch(url, {}, headers);
+  },
+
+  /** PATCH /api/v1/master/users/:userId/unfreeze → { success, message, data?: { user } } */
+  patchMasterUserUnfreeze: async (userId) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterUsers } = ApiConfig;
+    const url = `${baseUrl}${masterUsers}/${encodeURIComponent(userId)}/unfreeze`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPatch(url, {}, headers);
+  },
+
+  /** PATCH /api/v1/master/users/:userId/suspend → { success, message, data?: { user } } */
+  patchMasterUserSuspend: async (userId) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterUsers } = ApiConfig;
+    const url = `${baseUrl}${masterUsers}/${encodeURIComponent(userId)}/suspend`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPatch(url, {}, headers);
+  },
+
+  /** PATCH /api/v1/master/users/:userId/unsuspend → { success, message, data?: { user } } */
+  patchMasterUserUnsuspend: async (userId) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterUsers } = ApiConfig;
+    const url = `${baseUrl}${masterUsers}/${encodeURIComponent(userId)}/unsuspend`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPatch(url, {}, headers);
+  },
+
+  /** PATCH /api/v1/master/users/:userId/reactivate → { success, message, data?: { user } } */
+  patchMasterUserReactivate: async (userId) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterUsers } = ApiConfig;
+    const url = `${baseUrl}${masterUsers}/${encodeURIComponent(userId)}/reactivate`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPatch(url, {}, headers);
+  },
+
+  /** DELETE /api/v1/master/users/:userId → { success, message } */
+  deleteMasterUser: async (userId) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterUsers } = ApiConfig;
+    const url = `${baseUrl}${masterUsers}/${encodeURIComponent(userId)}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallDelete(url, headers);
+  },
+
+  /** POST /api/v1/master/users/assign-sub-admin – body: { subAdminId, userIds: string[] } → { success, message, data: { subAdminId, branchId, assignedCount, totalRequested } } */
+  postMasterUsersAssignSubAdmin: async (subAdminId, userIds) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterUsers } = ApiConfig;
+    const url = `${baseUrl}${masterUsers}/assign-sub-admin`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPost(url, { subAdminId, userIds: Array.isArray(userIds) ? userIds : [] }, headers);
+  },
+
+  /** POST /api/v1/master/users/unassign-sub-admin – body: { subAdminId, userIds: string[] } */
+  postMasterUsersUnassignSubAdmin: async (subAdminId, userIds) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterUsers } = ApiConfig;
+    const url = `${baseUrl}${masterUsers}/unassign-sub-admin`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPost(url, { subAdminId, userIds: Array.isArray(userIds) ? userIds : [] }, headers);
+  },
+
   /** GET /api/v1/master/users/:userId/wallet → { success, data: { wallet } } */
   getMasterUserWallet: async (userId) => {
     const token = sessionStorage.getItem("token");
@@ -91,6 +243,16 @@ const AuthService = {
     const url = `${baseUrl}${masterUsers}/${encodeURIComponent(userId)}/wallet`;
     const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
     return ApiCallGet(url, headers);
+  },
+
+  /** POST /api/v1/master/users/:userId/wallet/adjust – body: { type: "credit"|"debit", amount: number (min 1), description?: string (max 500) } */
+  postMasterUserWalletAdjust: async (userId, payload) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterUsers } = ApiConfig;
+    const url = `${baseUrl}${masterUsers}/${encodeURIComponent(userId)}/wallet/adjust`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPost(url, payload, headers);
   },
 
   /** GET /api/v1/master/users/:userId/transactions?type=deposit|withdrawal&page=1&limit=20 → { success, data: { transactions, pagination } } */
@@ -124,6 +286,25 @@ const AuthService = {
     return ApiCallGet(url, headers);
   },
 
+  /** GET /api/v1/master/casino-game-history?page=1&limit=20&search=...&gameCode=...&providerCode=...&from=...&to=... → { success, data: { list, pagination } } */
+  getMasterCasinoGameHistory: async (params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterCasinoGameHistory } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.page != null) q.set("page", params.page);
+    if (params.limit != null) q.set("limit", Math.min(100, Math.max(1, params.limit)));
+    if (params.search) q.set("search", params.search);
+    if (params.gameCode) q.set("gameCode", params.gameCode);
+    if (params.providerCode) q.set("providerCode", params.providerCode);
+    if (params.from) q.set("from", params.from);
+    if (params.to) q.set("to", params.to);
+    const query = q.toString();
+    const url = `${baseUrl}${masterCasinoGameHistory}${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
   /** GET /api/v1/master/games?page=1&limit=20&status=active&search=...&providerCode=...&category=...&sortBy=...&sortOrder=... → { success, data: { games, pagination } } */
   getMasterGames: async (params = {}) => {
     const token = sessionStorage.getItem("token");
@@ -144,6 +325,18 @@ const AuthService = {
     return ApiCallGet(url, headers);
   },
 
+  /** PATCH /api/v1/master/games/:gameId/status – body: { status: "active"|"inactive"|"maintenance" } → { status: "success", message, data: { game } } */
+  patchMasterGameStatus: async (gameId, status) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterGames } = ApiConfig;
+    const url = `${baseUrl}${masterGames}/${gameId}/status`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    const res = await ApiCallPatch(url, { status }, headers);
+    if (res?.status === "success") return { success: true, message: res.message, data: res.data };
+    return res;
+  },
+
   /** GET /api/v1/master/wallets?page=1&limit=20&search=... → { success, data: { wallets, pagination } } */
   getMasterWallets: async (params = {}) => {
     const token = sessionStorage.getItem("token");
@@ -157,6 +350,117 @@ const AuthService = {
     const url = `${baseUrl}${masterWallets}${query ? `?${query}` : ""}`;
     const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
     return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/master/deposit-account?ownerType=master|branch&branchId=&type=bank|upi&isActive=true|false&page=1&limit=20 → { success, data: { accounts, pagination } } */
+  getMasterDepositAccounts: async (params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterDepositAccount } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.ownerType) q.set("ownerType", params.ownerType);
+    if (params.branchId) q.set("branchId", params.branchId);
+    if (params.type) q.set("type", params.type);
+    if (params.isActive !== undefined && params.isActive !== null) q.set("isActive", String(params.isActive));
+    if (params.page != null) q.set("page", params.page);
+    if (params.limit != null) q.set("limit", Math.min(100, Math.max(1, params.limit)));
+    const query = q.toString();
+    const url = `${baseUrl}${masterDepositAccount}${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** POST /api/v1/master/deposit-account – body: type, ownerType, branchId?, bank fields or UPI fields, displayOrder? */
+  postMasterDepositAccount: async (body) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterDepositAccount } = ApiConfig;
+    const url = `${baseUrl}${masterDepositAccount}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPost(url, body, headers);
+  },
+
+  /** PUT /api/v1/master/deposit-account/:id – partial update */
+  putMasterDepositAccount: async (id, body) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterDepositAccount } = ApiConfig;
+    const url = `${baseUrl}${masterDepositAccount}/${encodeURIComponent(id)}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPut(url, body, headers);
+  },
+
+  /** PATCH /api/v1/master/deposit-account/status/:id – body: { isActive: true|false } */
+  patchMasterDepositAccountStatus: async (id, isActive) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterDepositAccount } = ApiConfig;
+    const url = `${baseUrl}${masterDepositAccount}/status/${encodeURIComponent(id)}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPatch(url, { isActive }, headers);
+  },
+
+  /** DELETE /api/v1/master/deposit-account/:id */
+  deleteMasterDepositAccount: async (id) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterDepositAccount } = ApiConfig;
+    const url = `${baseUrl}${masterDepositAccount}/${encodeURIComponent(id)}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallDelete(url, headers);
+  },
+
+  /** GET /api/v1/master/deposit-withdrawal-list?page=1&limit=20 → { success, data: { list, pagination } } */
+  getMasterDepositWithdrawalList: async (params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterDepositWithdrawalList } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.page != null) q.set("page", params.page);
+    if (params.limit != null) q.set("limit", Math.min(100, Math.max(1, params.limit)));
+    const query = q.toString();
+    const url = `${baseUrl}${masterDepositWithdrawalList}${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/master/deposits-withdrawals-monthwise → { success, data: [{ month, depositCount?, deposits?, depositAmount?, withdrawalCount?, withdrawals?, withdrawalAmount?, ... }] } */
+  getMasterDepositsWithdrawalsMonthwise: async (params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterDepositsWithdrawalsMonthwise } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.year != null) q.set("year", params.year);
+    if (params.from) q.set("from", params.from);
+    if (params.to) q.set("to", params.to);
+    const query = q.toString();
+    const url = `${baseUrl}${masterDepositsWithdrawalsMonthwise}${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/master/profit-loss-by-category?from=&to= → { success, data: { data: [{ category, categoryCode, profit, loss, net }], from, to } } */
+  getMasterProfitLossByCategory: async (params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterProfitLossByCategory } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.from) q.set("from", params.from);
+    if (params.to) q.set("to", params.to);
+    const query = q.toString();
+    const url = `${baseUrl}${masterProfitLossByCategory}${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** PATCH /api/v1/master/transaction-limits – body: { minDepositLimit, maxDepositLimit, bonusPercentage, minWithdrawalLimit, maxWithdrawalLimit } */
+  patchMasterTransactionLimits: async (payload) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterTransactionLimits } = ApiConfig;
+    const url = `${baseUrl}${masterTransactionLimits}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPatch(url, payload, headers);
   },
 
   /** GET /api/v1/master/deposit-requests?status=pending|approved|rejected&page=1&limit=20 (omit status for all) → { success, data: { deposits, pagination } } */
@@ -269,6 +573,329 @@ const AuthService = {
     if (params.limit != null) q.set("limit", Math.min(100, Math.max(1, params.limit)));
     const query = q.toString();
     const url = `${baseUrl}${masterWithdrawalRequests}/rejected${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/master/bets/dashboard → { success, data: { totalExposure, totalPL, openBets, settledBets } } */
+  getMasterBetsDashboard: async () => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterBets } = ApiConfig;
+    const url = `${baseUrl}${masterBets}/dashboard`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/master/bets/amount-stats → { success, data: { totalBetAmount, todayBetAmount, betAmount7d, betAmount30d } } */
+  getMasterBetsAmountStats: async () => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterBets } = ApiConfig;
+    const url = `${baseUrl}${masterBets}/amount-stats`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/master/bets/upline-stats → { success, data: [{ upline, exposure, pl, open, settled }] } */
+  getMasterBetsUplineStats: async () => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterBets } = ApiConfig;
+    const url = `${baseUrl}${masterBets}/upline-stats`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/master/bets/downline-stats → { success, data: [{ level, exposure, pl, bets }] } */
+  getMasterBetsDownlineStats: async () => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterBets } = ApiConfig;
+    const url = `${baseUrl}${masterBets}/downline-stats`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/master/bets?status=all|open|settled|cancelled&market=&upline=&from=&to=&search=&page=1&limit=20 → { success, data: { bets, total, page, limit } } */
+  getMasterBets: async (params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterBets } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.status) q.set("status", params.status);
+    if (params.market) q.set("market", params.market);
+    if (params.upline) q.set("upline", params.upline);
+    if (params.from) q.set("from", params.from);
+    if (params.to) q.set("to", params.to);
+    if (params.search) q.set("search", params.search);
+    if (params.page != null) q.set("page", params.page);
+    if (params.limit != null) q.set("limit", Math.min(100, Math.max(1, params.limit)));
+    const query = q.toString();
+    const url = `${baseUrl}${masterBets}${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** POST /api/v1/master/bets/:betId/settle – body: { result: "win"|"lose" } */
+  postMasterBetSettle: async (betId, payload) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterBets } = ApiConfig;
+    const url = `${baseUrl}${masterBets}/${encodeURIComponent(betId)}/settle`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPost(url, payload, headers);
+  },
+
+  /** POST /api/v1/master/bets/:betId/cancel – no body */
+  postMasterBetCancel: async (betId) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterBets } = ApiConfig;
+    const url = `${baseUrl}${masterBets}/${encodeURIComponent(betId)}/cancel`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPost(url, {}, headers);
+  },
+
+  /** POST /api/v1/master/sub-admin – body: fullName, mobileNumber, emailId, password, branchId?, branchName?, permissions? */
+  postMasterSubAdmin: async (body) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterSubAdmin } = ApiConfig;
+    const url = `${baseUrl}${masterSubAdmin}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPost(url, body, headers);
+  },
+
+  /** GET /api/v1/master/sub-admin?page=1&limit=20&isActive=true|false – list sub-admins */
+  getMasterSubAdmins: async (params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterSubAdmin } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.page != null) q.set("page", params.page);
+    if (params.limit != null) q.set("limit", Math.min(100, Math.max(1, params.limit)));
+    if (params.isActive === true || params.isActive === false) q.set("isActive", String(params.isActive));
+    const query = q.toString();
+    const url = `${baseUrl}${masterSubAdmin}${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/master/sub-admin/:id – view sub-admin details */
+  getMasterSubAdminById: async (id) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterSubAdmin } = ApiConfig;
+    const url = `${baseUrl}${masterSubAdmin}/${encodeURIComponent(id)}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/master/sub-admin/:subAdminId/assigned-users?page=1&limit=20 → { success, data: { users, subAdminId, pagination } } */
+  getMasterSubAdminAssignedUsers: async (subAdminId, params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterSubAdmin } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.page != null) q.set("page", params.page);
+    if (params.limit != null) q.set("limit", Math.min(100, Math.max(1, params.limit)));
+    const query = q.toString();
+    const url = `${baseUrl}${masterSubAdmin}/${encodeURIComponent(subAdminId)}/assigned-users${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** POST /api/v1/master/sub-admin/:id/unassign-users – body: { userIds: string[] } → { success, message, data: { subAdminId, unassignedCount, totalRequested } } */
+  postMasterSubAdminUnassignUsers: async (subAdminId, userIds) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterSubAdmin } = ApiConfig;
+    const url = `${baseUrl}${masterSubAdmin}/${encodeURIComponent(subAdminId)}/unassign-users`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPost(url, { userIds: Array.isArray(userIds) ? userIds : [] }, headers);
+  },
+
+  /** PATCH /api/v1/master/sub-admin/:id – edit (fullName, mobileNumber, emailId, password?, branchId?, branchName?, permissions?) */
+  patchMasterSubAdmin: async (id, body) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterSubAdmin } = ApiConfig;
+    const url = `${baseUrl}${masterSubAdmin}/${encodeURIComponent(id)}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPatch(url, body, headers);
+  },
+
+  /** PATCH /api/v1/master/sub-admin/:id/status – body: { isActive: true|false } */
+  patchMasterSubAdminStatus: async (id, isActive) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterSubAdmin } = ApiConfig;
+    const url = `${baseUrl}${masterSubAdmin}/${encodeURIComponent(id)}/status`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPatch(url, { isActive }, headers);
+  },
+
+  /** DELETE /api/v1/master/sub-admin/:id – soft delete */
+  deleteMasterSubAdmin: async (id) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterSubAdmin } = ApiConfig;
+    const url = `${baseUrl}${masterSubAdmin}/${encodeURIComponent(id)}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallDelete(url, headers);
+  },
+
+  /** GET /api/v1/master/sub-admin/settlements/pending?page=1&limit=20 – pending sub-admin settlements */
+  getMasterSubAdminSettlementsPending: async (params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterSubAdmin } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.page != null) q.set("page", params.page);
+    if (params.limit != null) q.set("limit", Math.min(100, Math.max(1, params.limit)));
+    const query = q.toString();
+    const url = `${baseUrl}${masterSubAdmin}/settlements/pending${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/master/sub-admin/settlements/settled?page=1&limit=20 – settled sub-admin settlements */
+  getMasterSubAdminSettlementsSettled: async (params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterSubAdmin } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.page != null) q.set("page", params.page);
+    if (params.limit != null) q.set("limit", Math.min(100, Math.max(1, params.limit)));
+    const query = q.toString();
+    const url = `${baseUrl}${masterSubAdmin}/settlements/settled${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/master/sub-admin/settlements/rejected?page=1&limit=20 – rejected sub-admin settlements */
+  getMasterSubAdminSettlementsRejected: async (params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterSubAdmin } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.page != null) q.set("page", params.page);
+    if (params.limit != null) q.set("limit", Math.min(100, Math.max(1, params.limit)));
+    const query = q.toString();
+    const url = `${baseUrl}${masterSubAdmin}/settlements/rejected${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** PATCH /api/v1/master/sub-admin/settlements/:settlementId/settle – mark settlement as settled */
+  patchMasterSubAdminSettlementSettle: async (settlementId) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterSubAdmin } = ApiConfig;
+    const url = `${baseUrl}${masterSubAdmin}/settlements/${encodeURIComponent(settlementId)}/settle`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPatch(url, {}, headers);
+  },
+
+  /** PATCH /api/v1/master/sub-admin/settlements/:settlementId/reject – body: { rejectReason?: string } */
+  patchMasterSubAdminSettlementReject: async (settlementId, body = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterSubAdmin } = ApiConfig;
+    const url = `${baseUrl}${masterSubAdmin}/settlements/${encodeURIComponent(settlementId)}/reject`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPatch(url, body && body.rejectReason ? { rejectReason: body.rejectReason } : {}, headers);
+  },
+
+  /** GET /api/v1/support/admin/tickets?search=&status=&page=1&limit=20 – list tickets */
+  getSupportAdminTickets: async (params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, supportAdmin } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.search) q.set("search", params.search);
+    if (params.status) q.set("status", params.status);
+    if (params.page != null) q.set("page", params.page);
+    if (params.limit != null) q.set("limit", Math.min(100, Math.max(1, params.limit)));
+    const query = q.toString();
+    const url = `${baseUrl}${supportAdmin}/tickets${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/support/admin/tickets/:ticketId – ticket detail + messages (marks as read for admin) */
+  getSupportAdminTicketDetail: async (ticketId) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, supportAdmin } = ApiConfig;
+    const url = `${baseUrl}${supportAdmin}/tickets/${encodeURIComponent(ticketId)}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** POST /api/v1/support/admin/tickets/:ticketId/reply – body: { message, attachmentUrl?, attachmentName? } */
+  postSupportAdminTicketReply: async (ticketId, body) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, supportAdmin } = ApiConfig;
+    const url = `${baseUrl}${supportAdmin}/tickets/${encodeURIComponent(ticketId)}/reply`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPost(url, body, headers);
+  },
+
+  /** PATCH /api/v1/support/admin/tickets/:ticketId/status – body: { status: "resolved" | "closed" } */
+  patchSupportAdminTicketStatus: async (ticketId, status) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, supportAdmin } = ApiConfig;
+    const url = `${baseUrl}${supportAdmin}/tickets/${encodeURIComponent(ticketId)}/status`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPatch(url, { status }, headers);
+  },
+
+  /** POST /api/v1/master/notifications/send-user – body: { userId, title, message, link? } */
+  postMasterNotificationSendUser: async (body) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterNotifications } = ApiConfig;
+    const url = `${baseUrl}${masterNotifications}/send-user`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPost(url, body, headers);
+  },
+
+  /** POST /api/v1/master/notifications/send-bulk – body: { userIds: string[], title, message, link? } */
+  postMasterNotificationSendBulk: async (body) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterNotifications } = ApiConfig;
+    const url = `${baseUrl}${masterNotifications}/send-bulk`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPost(url, body, headers);
+  },
+
+  /** POST /api/v1/master/notifications/send-all – body: { title, message, link? } */
+  postMasterNotificationSendAll: async (body) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterNotifications } = ApiConfig;
+    const url = `${baseUrl}${masterNotifications}/send-all`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallPost(url, body, headers);
+  },
+
+  /** GET /api/v1/master/notifications?page=1&limit=20&status=active|inactive&type=single|bulk|announce */
+  getMasterNotifications: async (params = {}) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterNotifications } = ApiConfig;
+    const q = new URLSearchParams();
+    if (params.page != null) q.set("page", params.page);
+    if (params.limit != null) q.set("limit", Math.min(100, Math.max(1, params.limit)));
+    if (params.status) q.set("status", params.status);
+    if (params.type) q.set("type", params.type);
+    const query = q.toString();
+    const url = `${baseUrl}${masterNotifications}${query ? `?${query}` : ""}`;
     const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
     return ApiCallGet(url, headers);
   },
@@ -404,12 +1031,13 @@ const AuthService = {
     return ApiCallGet(url, headers);
   },
 
-  /** GET /api/v1/user/deposit-accounts/master – auth required. Returns { data: { accounts, source } }. */
-  getMasterDepositAccounts: async () => {
+  /** GET /api/v1/user/deposit-accounts/master – auth required. Returns { data: { accounts, source } }. (User-facing; admin list uses getMasterDepositAccounts with params.) */
+  getUserDepositAccountsMaster: async () => {
     const token = sessionStorage.getItem("token");
     if (!token) return { success: false, message: "Login required" };
-    const { baseBettingUser, depositAccountsMaster } = ApiConfig;
-    const url = `${baseBettingUser}/${depositAccountsMaster}`;
+    const { baseUrl } = ApiConfig;
+    const path = "/api/v1/user/deposit-accounts/master";
+    const url = `${baseUrl}${path}`;
     const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
     return ApiCallGet(url, headers);
   },

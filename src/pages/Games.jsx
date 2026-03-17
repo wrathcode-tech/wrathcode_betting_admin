@@ -70,7 +70,16 @@ export default function Games() {
   const [statsOpen, setStatsOpen] = useState(false)
   const [selectedGame, setSelectedGame] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [updatingGameId, setUpdatingGameId] = useState(null)
+  const [activeCount, setActiveCount] = useState(null)
+  const [inactiveCount, setInactiveCount] = useState(null)
   const { addToast } = useToast()
+
+  const GAME_STATUS_OPTIONS = [
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+    { value: 'maintenance', label: 'Maintenance' },
+  ]
 
   const fetchGames = useCallback(() => {
     setLoading(true)
@@ -86,16 +95,22 @@ export default function Games() {
         if (res?.success && res?.data) {
           setGames(res.data.games || [])
           setPagination(res.data.pagination || { page: 1, limit: 20, total: 0, totalPages: 1 })
+          if (res.data.activeCount != null) setActiveCount(Number(res.data.activeCount))
+          if (res.data.inactiveCount != null) setInactiveCount(Number(res.data.inactiveCount))
           setError(null)
         } else {
           setGames([])
           setPagination({ page: 1, limit: 20, total: 0, totalPages: 1 })
+          setActiveCount(null)
+          setInactiveCount(null)
           setError(res?.message || 'Failed to load games')
         }
       })
       .catch(() => {
         setGames([])
         setPagination({ page: 1, limit: 20, total: 0, totalPages: 1 })
+        setActiveCount(null)
+        setInactiveCount(null)
         setError('Failed to load games')
       })
       .finally(() => setLoading(false))
@@ -120,8 +135,6 @@ export default function Games() {
 
   const stats = {
     total,
-    live: games.filter((g) => g.status === 'active').length,
-    categories: [...new Set(games.map((g) => getCategoryLabel(g)).filter(Boolean))].length,
     totalPlayers: games.reduce((s, g) => s + Number(g.playCount || 0), 0),
   }
 
@@ -143,6 +156,25 @@ export default function Games() {
   function handleDelete(id) {
     addToast('Delete game API not implemented', 'error')
     setDeleteConfirm(null)
+  }
+
+  function handleStatusChange(gameId, newStatus) {
+    if (!gameId || !['active', 'inactive', 'maintenance'].includes(newStatus)) return
+    setUpdatingGameId(gameId)
+    AuthService.patchMasterGameStatus(gameId, newStatus)
+      .then((res) => {
+        if (res?.success && res?.data?.game) {
+          setGames((prev) => prev.map((g) => (g._id === gameId ? { ...g, ...res.data.game, status: res.data.game.status } : g)))
+          addToast(res.message || 'Game status updated', 'success')
+        } else if (res?.success) {
+          setGames((prev) => prev.map((g) => (g._id === gameId ? { ...g, status: newStatus } : g)))
+          addToast(res.message || 'Game status updated', 'success')
+        } else {
+          addToast(res?.message || 'Failed to update status', 'error')
+        }
+      })
+      .catch(() => addToast('Failed to update status', 'error'))
+      .finally(() => setUpdatingGameId(null))
   }
 
   const btnPrimary =
@@ -179,8 +211,8 @@ export default function Games() {
               <HiStatusOnline className="w-5 h-5 text-emerald-600" />
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Active (page)</p>
-              <p className="text-lg font-bold text-gray-900">{stats.live}</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Active games</p>
+              <p className="text-lg font-bold text-gray-900">{loading ? '…' : (activeCount != null ? activeCount : '–')}</p>
             </div>
           </div>
         </div>
@@ -190,8 +222,8 @@ export default function Games() {
               <HiTag className="w-5 h-5 text-indigo-600" />
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Categories (page)</p>
-              <p className="text-lg font-bold text-gray-900">{stats.categories}</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Inactive games</p>
+              <p className="text-lg font-bold text-gray-900">{loading ? '…' : (inactiveCount != null ? inactiveCount : '–')}</p>
             </div>
           </div>
         </div>
@@ -244,6 +276,7 @@ export default function Games() {
             <option value="">All Status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
+            <option value="maintenance">Maintenance</option>
           </select>
           <select
             value={categoryFilter}
@@ -336,13 +369,16 @@ export default function Games() {
                       <span className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-medium ${getCategoryStyle(getCategoryLabel(g))}`}>
                         {getCategoryLabel(g)}
                       </span>
-                      <span
-                        className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-medium ${
-                          g.status === 'active' ? 'bg-emerald-500/20 text-emerald-600' : 'bg-amber-100 text-amber-700'
-                        }`}
+                      <select
+                        value={g.status || 'inactive'}
+                        onChange={(e) => handleStatusChange(g._id, e.target.value)}
+                        disabled={updatingGameId === g._id}
+                        className="text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-700 py-1 px-2 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 focus:outline-none disabled:opacity-60"
                       >
-                        {g.status === 'active' ? 'Active' : g.status || '–'}
-                      </span>
+                        {GAME_STATUS_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -402,13 +438,16 @@ export default function Games() {
                   </td>
                   <td className="py-4 px-5 text-gray-600">{(g.playCount ?? 0).toLocaleString('en-IN')}</td>
                   <td className="py-4 px-5">
-                    <span
-                      className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-medium ${
-                        g.status === 'active' ? 'bg-emerald-500/20 text-emerald-600' : 'bg-amber-100 text-amber-700'
-                      }`}
+                    <select
+                      value={g.status || 'inactive'}
+                      onChange={(e) => handleStatusChange(g._id, e.target.value)}
+                      disabled={updatingGameId === g._id}
+                      className="text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 py-1.5 px-2.5 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 focus:outline-none disabled:opacity-60"
                     >
-                      {g.status === 'active' ? 'Active' : g.status || '–'}
-                    </span>
+                      {GAME_STATUS_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
                   </td>
                   <td className="py-4 px-5 text-right">
                     <div className="flex items-center justify-end gap-2">

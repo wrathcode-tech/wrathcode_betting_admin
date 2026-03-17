@@ -18,8 +18,9 @@ const routeNames = {
   support: 'Support',
   notifications: 'Notifications',
   'audit-logs': 'Admin Logs',
+  'deposit-accounts': 'Deposit Accounts',
   profile: 'Profile',
-  settings: 'Platform Configuration',
+  settings: 'Settings',
 }
 
 export default function Breadcrumb() {

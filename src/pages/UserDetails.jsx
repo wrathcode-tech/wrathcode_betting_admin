@@ -23,7 +23,6 @@ import Badge from '../components/ui/Badge'
 import { useAuth } from '../context/AuthContext'
 import { PERMISSIONS } from '../constants/roles'
 import AuthService from '../api/services/AuthService'
-import { getTicketsByUser, getReferralByUser } from '../services/api'
 
 /** Normalize API user (e.g. from GET /api/v1/master/users/:userId) to page shape */
 function normalizeUserDetail(apiUser) {
@@ -109,12 +108,20 @@ export default function UserDetails() {
   const { userId } = useParams()
   const navigate = useNavigate()
   const [user, setUser] = useState(null)
+  const [portfolio, setPortfolio] = useState({ balance: null, bonusBalance: null, totalBalance: null })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('user-details')
   const [tickets, setTickets] = useState([])
+  const [ticketsPagination, setTicketsPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 })
+  const [ticketsLoading, setTicketsLoading] = useState(false)
+  const [ticketsError, setTicketsError] = useState(null)
+  const [ticketsPage, setTicketsPage] = useState(1)
   const [referralData, setReferralData] = useState(null)
+  const [referralLoading, setReferralLoading] = useState(false)
+  const [referralError, setReferralError] = useState(null)
   const [wallet, setWallet] = useState(null)
+  const [walletUuid, setWalletUuid] = useState(null)
   const [walletLoading, setWalletLoading] = useState(false)
   const [walletError, setWalletError] = useState(null)
   const [transactions, setTransactions] = useState([])
@@ -145,14 +152,22 @@ export default function UserDetails() {
     AuthService.getMasterUserById(userId)
       .then((res) => {
         if (res?.success && res?.data) {
-          setUser(normalizeUserDetail(res.data))
+          const d = res.data
+          setUser(normalizeUserDetail(d))
+          setPortfolio({
+            balance: d.balance != null ? Number(d.balance) : null,
+            bonusBalance: d.bonusBalance != null ? Number(d.bonusBalance) : null,
+            totalBalance: d.totalBalance != null ? Number(d.totalBalance) : null,
+          })
         } else {
           setUser(null)
+          setPortfolio({ balance: null, bonusBalance: null, totalBalance: null })
           setError(res?.message || 'User not found')
         }
       })
       .catch(() => {
         setUser(null)
+        setPortfolio({ balance: null, bonusBalance: null, totalBalance: null })
         setError('Failed to load user')
       })
       .finally(() => setLoading(false))
@@ -170,10 +185,49 @@ export default function UserDetails() {
   }, [user?.id])
 
   useEffect(() => {
-    if (!user?.id) return
-    getTicketsByUser(user.id).then((r) => setTickets(r.data || []))
-    getReferralByUser(user.id).then((r) => setReferralData(r.data || null))
-  }, [user?.id])
+    if (activeTab !== 'support-tickets' || !userId) return
+    setTicketsLoading(true)
+    setTicketsError(null)
+    AuthService.getMasterUserSupportTickets(userId, { page: ticketsPage, limit: 20 })
+      .then((res) => {
+        if (res?.success && res?.data) {
+          setTickets(res.data.tickets || [])
+          setTicketsPagination(res.data.pagination || { page: 1, limit: 20, total: 0, totalPages: 1 })
+          setTicketsError(null)
+        } else {
+          setTickets([])
+          setTicketsPagination({ page: 1, limit: 20, total: 0, totalPages: 1 })
+          setTicketsError(res?.message || 'Failed to load support tickets')
+        }
+      })
+      .catch(() => {
+        setTickets([])
+        setTicketsPagination({ page: 1, limit: 20, total: 0, totalPages: 1 })
+        setTicketsError('Failed to load support tickets')
+      })
+      .finally(() => setTicketsLoading(false))
+  }, [activeTab, userId, ticketsPage])
+
+  useEffect(() => {
+    if (activeTab !== 'referral' || !userId) return
+    setReferralLoading(true)
+    setReferralError(null)
+    AuthService.getMasterUserReferralStats(userId)
+      .then((res) => {
+        if (res?.success && res?.data != null) {
+          setReferralData(res.data)
+          setReferralError(null)
+        } else {
+          setReferralData(null)
+          setReferralError(res?.message || 'Failed to load referral stats')
+        }
+      })
+      .catch(() => {
+        setReferralData(null)
+        setReferralError('Failed to load referral stats')
+      })
+      .finally(() => setReferralLoading(false))
+  }, [activeTab, userId])
 
   useEffect(() => {
     if (activeTab !== 'wallet-details' || !userId) return
@@ -183,14 +237,17 @@ export default function UserDetails() {
       .then((res) => {
         if (res?.success && res?.data?.wallet) {
           setWallet(res.data.wallet)
+          setWalletUuid(res.data.uuid ?? null)
           setWalletError(null)
         } else {
           setWallet(null)
+          setWalletUuid(null)
           setWalletError(res?.message || 'Failed to load wallet')
         }
       })
       .catch(() => {
         setWallet(null)
+        setWalletUuid(null)
         setWalletError('Failed to load wallet')
       })
       .finally(() => setWalletLoading(false))
@@ -277,15 +334,15 @@ export default function UserDetails() {
     lastFailedLogin: user.lastFailedLogin || null,
     ...user,
   }
-  const mainBalance = user.balanceFiat ?? 0
-  const bonusBalance = user.bonusBalance ?? 0
-  const totalBalance = mainBalance + bonusBalance
+  const mainBalance = portfolio.balance != null ? portfolio.balance : (user.balanceFiat ?? 0)
+  const bonusBal = portfolio.bonusBalance != null ? portfolio.bonusBalance : (user.bonusBalance ?? 0)
+  const totalBal = portfolio.totalBalance != null ? portfolio.totalBalance : (mainBalance + bonusBal)
 
   return (
     <div className="space-y-0">
       <PageBanner
         title={user.name}
-        subtitle={`${user.email}${user.phone ? ' • ' + user.phone : ''} – PlayAdd / BetFury`}
+        subtitle={`${user.email}${user.phone ? ' • ' + user.phone : ''}`}
         icon={HiUser}
       />
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4">
@@ -319,9 +376,8 @@ export default function UserDetails() {
                       <button
                         type="button"
                         onClick={() => setActiveTab(item.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                          isActive ? 'bg-teal-50 text-teal-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                        }`}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-teal-50 text-teal-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                          }`}
                       >
                         <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-teal-600' : 'text-gray-400'}`} />
                         {item.label}
@@ -339,7 +395,7 @@ export default function UserDetails() {
           {activeTab === 'user-details' && (
             <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
               <Card title="Basic Information" icon={HiIdentification}>
-                <Row label="User ID" value={`${user.id}`} />
+                <Row label="User ID" value={user.uuid} />
                 <Row label="Full Name" value={user.name} />
                 <Row label="Email" value={user.email} />
                 <Row label="Mobile" value={user.phone || '–'} />
@@ -349,7 +405,6 @@ export default function UserDetails() {
                 <Row label="Language" value={user.language ? (user.language === 'hi' ? 'Hindi' : user.language === 'en' ? 'English' : user.language) : '–'} />
               </Card>
               <Card title="Account" icon={HiUser}>
-                <Row label="UUID" value={user.uuid || user.id} />
                 <Row label="Referral" value={user.referralCode} />
                 <Row label="Status" value={<span className="text-teal-600 font-semibold">{user.status === 'active' ? 'Active' : user.status}</span>} />
                 <Row label="KYC Status" value={user.kyc ? user.kyc.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '–'} />
@@ -382,35 +437,35 @@ export default function UserDetails() {
                     )}
                   </div>
                 ) : (
-                    <form onSubmit={(e) => { e.preventDefault(); setLimitsEditMode(false); }} className="space-y-3">
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-0.5">Max single bet (₹)</label>
-                        <input type="number" min={0} value={personalLimits.maxSingleBet} onChange={(e) => setPersonalLimits((p) => ({ ...p, maxSingleBet: Number(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm" />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-0.5">Daily loss limit (₹)</label>
-                        <input type="number" min={0} value={personalLimits.dailyLossLimit} onChange={(e) => setPersonalLimits((p) => ({ ...p, dailyLossLimit: Number(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm" />
-                      </div>
-                      <div className="flex gap-2">
-                        <button type="submit" className="px-3 py-1.5 rounded-lg bg-teal-500 text-white text-sm font-medium">Save</button>
-                        <button type="button" onClick={() => setLimitsEditMode(false)} className="px-3 py-1.5 rounded-lg bg-gray-200 text-gray-700 text-sm">Cancel</button>
-                      </div>
-                    </form>
-                  )}
+                  <form onSubmit={(e) => { e.preventDefault(); setLimitsEditMode(false); }} className="space-y-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Max single bet (₹)</label>
+                      <input type="number" min={0} value={personalLimits.maxSingleBet} onChange={(e) => setPersonalLimits((p) => ({ ...p, maxSingleBet: Number(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Daily loss limit (₹)</label>
+                      <input type="number" min={0} value={personalLimits.dailyLossLimit} onChange={(e) => setPersonalLimits((p) => ({ ...p, dailyLossLimit: Number(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm" />
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="submit" className="px-3 py-1.5 rounded-lg bg-teal-500 text-white text-sm font-medium">Save</button>
+                      <button type="button" onClick={() => setLimitsEditMode(false)} className="px-3 py-1.5 rounded-lg bg-gray-200 text-gray-700 text-sm">Cancel</button>
+                    </div>
+                  </form>
+                )}
               </Card>
               <Card title="Portfolio (INR)" icon={HiCash} className="lg:col-span-2">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div className="p-3 rounded-xl bg-teal-50 border border-teal-100">
-                    <p className="text-xs text-gray-500 uppercase">Total</p>
-                    <p className="text-lg font-bold text-teal-700">₹{totalBalance.toLocaleString()}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Balance</p>
+                    <p className="text-xl font-bold text-gray-900 mt-1">₹{Number(mainBalance).toLocaleString('en-IN')}</p>
                   </div>
-                  <div className="p-3 rounded-xl bg-gray-50 border border-gray-200">
-                    <p className="text-xs text-gray-500 uppercase">Main</p>
-                    <p className="text-lg font-bold text-gray-900">₹{mainBalance.toLocaleString()}</p>
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-100">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Bonus Balance</p>
+                    <p className="text-xl font-bold text-amber-700 mt-1">₹{Number(bonusBal).toLocaleString('en-IN')}</p>
                   </div>
-                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-100">
-                    <p className="text-xs text-gray-500 uppercase">Bonus</p>
-                    <p className="text-lg font-bold text-amber-700">₹{bonusBalance.toLocaleString()}</p>
+                  <div className="p-4 rounded-xl bg-teal-50 border border-teal-100">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Balance</p>
+                    <p className="text-xl font-bold text-teal-700 mt-1">₹{Number(totalBal).toLocaleString('en-IN')}</p>
                   </div>
                 </div>
               </Card>
@@ -425,7 +480,7 @@ export default function UserDetails() {
                 <p className="text-sm text-red-600">{walletError}</p>
               ) : wallet ? (
                 <>
-                  <Row label="User ID" value={wallet.userId} />
+                  <Row label="User ID" value={walletUuid ?? wallet.userId} />
                   <Row label="Balance" value={wallet.currency === 'INR' ? `₹${Number(wallet.balance ?? 0).toLocaleString()}` : `${wallet.currency} ${Number(wallet.balance ?? 0).toLocaleString()}`} />
                   <Row label="Currency" value={wallet.currency ?? '–'} />
                   <Row label="Bonus Balance" value={wallet.currency === 'INR' ? `₹${Number(wallet.bonusBalance ?? 0).toLocaleString()}` : `${wallet.currency} ${Number(wallet.bonusBalance ?? 0).toLocaleString()}`} />
@@ -481,33 +536,37 @@ export default function UserDetails() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-gray-200 text-left text-gray-500">
-                            <th className="py-2 pr-4">Type</th>
+                            <th className="py-2 pr-4 w-14">Sr No.</th>
+                            <th className="py-2">Date & Time</th>
+                            <th className="py-2 pr-4">Transaction Id</th>
+                            <th className="py-2 pr-4">Transaction Type</th>
                             <th className="py-2 pr-4">Amount</th>
-                            <th className="py-2 pr-4">Credit</th>
-                            <th className="py-2 pr-4">Debit</th>
+                            {/* <th className="py-2 pr-4">Credit</th>
+                            <th className="py-2 pr-4">Debit</th> */}
                             <th className="py-2 pr-4">Status</th>
                             <th className="py-2 pr-4">Balance Before</th>
                             <th className="py-2 pr-4">Balance After</th>
                             <th className="py-2 pr-4">Remarks</th>
-                            <th className="py-2">Created</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {transactions.map((t) => (
-                            <tr key={t._id} className="border-b border-gray-100">
+                          {transactions.map((t, idx) => (
+                            <tr key={t._id || t.id || idx} className="border-b border-gray-100">
+                              <td className="py-2.5 pr-4 text-gray-600 font-medium">{(txPage - 1) * txLimit + idx + 1}</td>
+                              <td className="py-2.5 text-gray-500">{formatDateTime(t.createdAt)}</td>
+                              <td className="py-2.5 pr-4 font-mono text-xs text-teal-600" title={t.transactionId || t._id || t.id}>{t.transactionId || t._id || t.id || '–'}</td>
                               <td className="py-2.5 pr-4">
                                 <Badge variant={t.type === 'deposit' ? 'success' : 'warning'}>{t.type || '–'}</Badge>
                               </td>
                               <td className="py-2.5 pr-4 font-medium">₹{Number(t.amount ?? 0).toLocaleString()}</td>
-                              <td className="py-2.5 pr-4 text-teal-600">₹{Number(t.credit ?? 0).toLocaleString()}</td>
-                              <td className="py-2.5 pr-4 text-gray-600">₹{Number(t.debit ?? 0).toLocaleString()}</td>
+                              {/* <td className="py-2.5 pr-4 text-teal-600">₹{Number(t.credit ?? 0).toLocaleString()}</td>
+                              <td className="py-2.5 pr-4 text-gray-600">₹{Number(t.debit ?? 0).toLocaleString()}</td> */}
                               <td className="py-2.5 pr-4">
                                 <Badge variant={t.status === 'completed' || t.status === 'success' ? 'success' : t.status === 'failed' ? 'error' : 'warning'}>{t.status || '–'}</Badge>
                               </td>
                               <td className="py-2.5 pr-4 text-gray-600">₹{Number(t.balanceBefore ?? 0).toLocaleString()}</td>
                               <td className="py-2.5 pr-4 text-gray-600">₹{Number(t.balanceAfter ?? 0).toLocaleString()}</td>
                               <td className="py-2.5 pr-4 text-gray-500 max-w-[120px] truncate" title={t.remarks}>{t.remarks || '–'}</td>
-                              <td className="py-2.5 text-gray-500">{formatDateTime(t.createdAt)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -584,10 +643,11 @@ export default function UserDetails() {
                     <table className="w-full text-sm min-w-[800px]">
                       <thead>
                         <tr className="border-b border-gray-200 text-left text-gray-500">
+                          <th className="py-2 pr-4 w-14">Sr No.</th>
+                          <th className="py-2 pr-4">Date / Time</th>
                           <th className="py-2 pr-4">Game</th>
                           <th className="py-2 pr-4">Game Code</th>
                           <th className="py-2 pr-4">Provider</th>
-                          <th className="py-2 pr-4">Date / Time</th>
                           <th className="py-2 pr-4">Bet Amount</th>
                           <th className="py-2 pr-4">Result</th>
                           <th className="py-2 pr-4">Status</th>
@@ -600,10 +660,11 @@ export default function UserDetails() {
                       <tbody>
                         {gameHistory.map((g, i) => (
                           <tr key={g.providerRoundId || g.sessionId || i} className="border-b border-gray-100">
+                            <td className="py-2.5 pr-4 text-gray-600 font-medium">{(ghPage - 1) * ghLimit + i + 1}</td>
+                            <td className="py-2.5 pr-4 text-gray-500">{formatDateTime(g.dateTime || g.betAt)}</td>
                             <td className="py-2.5 pr-4 font-medium text-gray-900">{g.gameName || '–'}</td>
                             <td className="py-2.5 pr-4 font-mono text-gray-600">{g.gameCode || '–'}</td>
                             <td className="py-2.5 pr-4 text-gray-600">{g.providerCode || '–'}</td>
-                            <td className="py-2.5 pr-4 text-gray-500">{formatDateTime(g.dateTime || g.betAt)}</td>
                             <td className="py-2.5 pr-4 font-medium">₹{Number(g.betAmount ?? 0).toLocaleString()}</td>
                             <td className="py-2.5 pr-4">{g.result || '–'}</td>
                             <td className="py-2.5 pr-4">
@@ -652,44 +713,87 @@ export default function UserDetails() {
 
           {activeTab === 'support-tickets' && (
             <Card title="Support Tickets" icon={HiTicket}>
-              {tickets.length === 0 ? (
-                <p className="text-sm text-gray-500">No support tickets.</p>
+              {ticketsLoading ? (
+                <p className="text-sm text-gray-500 py-4">Loading support tickets…</p>
+              ) : ticketsError ? (
+                <p className="text-sm text-red-600 py-4">{ticketsError}</p>
+              ) : tickets.length === 0 ? (
+                <p className="text-sm text-gray-500 py-4">No support tickets.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200 text-left text-gray-500">
-                        <th className="py-2 pr-4">ID</th>
-                        <th className="py-2 pr-4">Subject</th>
-                        <th className="py-2 pr-4">Priority</th>
-                        <th className="py-2 pr-4">Status</th>
-                        <th className="py-2">Created</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tickets.map((t) => (
-                        <tr key={t.id} className="border-b border-gray-100">
-                          <td className="py-2.5 pr-4 font-mono text-gray-700">{t.id}</td>
-                          <td className="py-2.5 pr-4 font-medium">{t.subject}</td>
-                          <td className="py-2.5 pr-4"><Badge variant={t.priority === 'high' ? 'error' : 'warning'}>{t.priority}</Badge></td>
-                          <td className="py-2.5 pr-4"><Badge variant={t.status === 'closed' ? 'neutral' : 'success'}>{t.status}</Badge></td>
-                          <td className="py-2.5 text-gray-500">{formatDateTime(t.createdAt)}</td>
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-left text-gray-500">
+                          <th className="py-2 pr-4">Ticket ID</th>
+                          <th className="py-2 pr-4">Subject</th>
+                          <th className="py-2 pr-4">Category</th>
+                          <th className="py-2 pr-4">Priority</th>
+                          <th className="py-2 pr-4">Status</th>
+                          <th className="py-2 pr-4">Created</th>
+                          <th className="py-2">Last message</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {tickets.map((t) => (
+                          <tr key={t._id} className="border-b border-gray-100">
+                            <td className="py-2.5 pr-4 font-mono text-gray-700">{t.ticketId || t._id}</td>
+                            <td className="py-2.5 pr-4 font-medium">{t.subject || '–'}</td>
+                            <td className="py-2.5 pr-4 text-gray-600 capitalize">{t.category || '–'}</td>
+                            <td className="py-2.5 pr-4">
+                              <Badge variant={t.priority === 'high' ? 'error' : t.priority === 'medium' ? 'warning' : 'neutral'}>{t.priority || '–'}</Badge>
+                            </td>
+                            <td className="py-2.5 pr-4">
+                              <Badge variant={t.status === 'closed' ? 'neutral' : t.status === 'resolved' ? 'success' : 'warning'}>{t.status || '–'}</Badge>
+                            </td>
+                            <td className="py-2.5 pr-4 text-gray-500">{formatDateTime(t.createdAt)}</td>
+                            <td className="py-2.5 text-gray-500">{formatDateTime(t.lastMessageAt)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {ticketsPagination.totalPages > 1 && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-3 mt-3 border-t border-gray-200">
+                      <p className="text-xs text-gray-500">
+                        Page {ticketsPage} of {ticketsPagination.totalPages} ({ticketsPagination.total} total)
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setTicketsPage((p) => Math.max(1, p - 1))}
+                          disabled={ticketsPage <= 1}
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 border border-gray-200 hover:bg-gray-200 disabled:opacity-50 disabled:pointer-events-none"
+                        >
+                          <HiChevronLeft className="w-4 h-4 inline mr-1" /> Prev
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTicketsPage((p) => Math.min(ticketsPagination.totalPages, p + 1))}
+                          disabled={ticketsPage >= ticketsPagination.totalPages}
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 border border-gray-200 hover:bg-gray-200 disabled:opacity-50 disabled:pointer-events-none"
+                        >
+                          Next <HiChevronRight className="w-4 h-4 inline ml-1" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </Card>
           )}
 
           {activeTab === 'referral' && (
             <Card title="Referral" icon={HiUserGroup}>
-              <Row label="Referral Code" value={user.referralCode || '–'} />
-              {referralData && (
+              {referralLoading ? (
+                <p className="text-sm text-gray-500 py-4">Loading referral stats…</p>
+              ) : referralError ? (
+                <p className="text-sm text-red-600 py-4">{referralError}</p>
+              ) : referralData ? (
                 <>
-                  <Row label="Referred Count" value={String(referralData.referredCount)} />
-                  <Row label="Total Commission (₹)" value={referralData.totalCommission?.toLocaleString()} />
+                  <Row label="Referral Code" value={referralData.referralCode ?? user?.referralCode ?? '–'} />
+                  <Row label="Referred Count" value={referralData.referredCount != null ? String(referralData.referredCount) : '–'} />
+                  <Row label="Total Commission (₹)" value={referralData.totalCommission != null ? Number(referralData.totalCommission).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '–'} />
                   {referralData.payouts?.length > 0 && (
                     <div className="pt-2">
                       <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Payouts</p>
@@ -714,6 +818,8 @@ export default function UserDetails() {
                     </div>
                   )}
                 </>
+              ) : (
+                <p className="text-sm text-gray-500 py-4">No referral data.</p>
               )}
             </Card>
           )}

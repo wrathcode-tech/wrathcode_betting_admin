@@ -3,7 +3,7 @@
  * GET /api/v1/master/withdrawal-requests (all), .../pending, .../approved, .../rejected
  */
 import React, { useState, useEffect } from 'react'
-import { HiSearch, HiDownload, HiCheck, HiX, HiArrowUp, HiChevronLeft, HiChevronRight, HiEye } from 'react-icons/hi'
+import { HiSearch, HiDownload, HiCheck, HiX, HiArrowUp, HiChevronLeft, HiChevronRight, HiEye, HiUser, HiCreditCard } from 'react-icons/hi'
 import PageBanner from '../components/PageBanner'
 import Badge from '../components/ui/Badge'
 import Modal from '../components/Modal'
@@ -117,6 +117,7 @@ export default function Withdrawals() {
   const filtered = search.trim()
     ? withdrawals.filter(
         (w) =>
+          (w.uuid && String(w.uuid).toLowerCase().includes(search.toLowerCase())) ||
           (w._id && String(w._id).toLowerCase().includes(search.toLowerCase())) ||
           (w.userId?.mobile && String(w.userId.mobile).includes(search)) ||
           (w.userId?.fullName && w.userId.fullName.toLowerCase().includes(search.toLowerCase())) ||
@@ -206,10 +207,10 @@ export default function Withdrawals() {
       addToast('No data to export', 'error')
       return
     }
-    const headers = ['ID', 'User', 'Amount', 'Status', 'Withdrawal To', 'Processed', 'Created']
+    const headers = ['User ID', 'User', 'Amount', 'Status', 'Withdrawal To', 'Processed', 'Created']
     const rows = filtered.map((w) =>
       [
-        w._id,
+        w.uuid ?? w._id,
         userLabel(w),
         w.amount,
         statusLabel(w.status),
@@ -295,7 +296,7 @@ export default function Withdrawals() {
           <table className="w-full min-w-[900px]">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">ID</th>
+                <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">User ID</th>
                 <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">User</th>
                 <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Amount</th>
                 <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Status</th>
@@ -332,8 +333,8 @@ export default function Withdrawals() {
               ) : (
                 filtered.map((w) => (
                   <tr key={w._id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-4 px-5 text-teal-600 font-mono text-sm truncate max-w-[120px]" title={w._id}>
-                      {w._id}
+                    <td className="py-4 px-5 text-teal-600 font-mono text-sm truncate max-w-[120px]" title={w.uuid ?? w._id}>
+                      {w.uuid ?? w._id ?? '–'}
                     </td>
                     <td className="py-4 px-5 text-gray-900 font-medium">{userLabel(w)}</td>
                     <td className="py-4 px-5 font-medium text-gray-900">{formatAmount(w)}</td>
@@ -426,71 +427,117 @@ export default function Withdrawals() {
         )}
       </div>
 
-      {/* View bank & user details modal */}
-      <Modal open={!!viewDetailWithdrawal} onClose={() => setViewDetailWithdrawal(null)} title="Withdrawal details – Bank & user">
+      {/* View bank & user details modal – premium */}
+      <Modal open={!!viewDetailWithdrawal} onClose={() => setViewDetailWithdrawal(null)} title="Withdrawal details" size="lg" scrollable>
         {viewDetailWithdrawal && (
           <div className="space-y-6">
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">User</h3>
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                {viewDetailWithdrawal.userId?.fullName != null && (
-                  <>
-                    <dt className="text-gray-500">Full name</dt>
-                    <dd className="text-gray-900 font-medium">{viewDetailWithdrawal.userId.fullName}</dd>
-                  </>
-                )}
-                {viewDetailWithdrawal.userId?.mobile != null && (
-                  <>
-                    <dt className="text-gray-500">Mobile</dt>
-                    <dd className="text-gray-900">{viewDetailWithdrawal.userId.mobile}</dd>
-                  </>
-                )}
-                {viewDetailWithdrawal.userId?.email != null && (
-                  <>
-                    <dt className="text-gray-500">Email</dt>
-                    <dd className="text-gray-900">{viewDetailWithdrawal.userId.email}</dd>
-                  </>
-                )}
-                {viewDetailWithdrawal.userId?._id != null && (
-                  <>
-                    <dt className="text-gray-500">User ID</dt>
-                    <dd className="text-gray-900 font-mono text-xs break-all">{viewDetailWithdrawal.userId._id}</dd>
-                  </>
-                )}
-              </dl>
-              {!viewDetailWithdrawal.userId && (
-                <p className="text-gray-500 text-sm">No user details available.</p>
-              )}
+            {/* Summary strip */}
+            <div className="flex flex-wrap items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-teal-50 via-emerald-50/50 to-teal-50 border border-teal-100">
+              <div>
+                <p className="text-xs font-medium text-teal-600 uppercase tracking-wider">Amount</p>
+                <p className="text-xl font-bold text-gray-900 mt-0.5">{formatAmount(viewDetailWithdrawal)}</p>
+              </div>
+              <div className="h-8 w-px bg-teal-200 hidden sm:block" />
+              <div>
+                <p className="text-xs font-medium text-teal-600 uppercase tracking-wider">Status</p>
+                <p className="mt-0.5">
+                  <Badge variant={badgeVariant(viewDetailWithdrawal.status)}>{statusLabel(viewDetailWithdrawal.status)}</Badge>
+                </p>
+              </div>
+              <div className="h-8 w-px bg-teal-200 hidden sm:block" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-teal-600 uppercase tracking-wider">Withdrawal ID</p>
+                <p className="text-sm font-mono text-gray-700 truncate mt-0.5" title={viewDetailWithdrawal.transactionId ?? viewDetailWithdrawal._id}>{viewDetailWithdrawal.transactionId ?? viewDetailWithdrawal._id ?? '–'}</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Bank / withdrawal to</h3>
-              {viewDetailWithdrawal.withdrawalToDetail && typeof viewDetailWithdrawal.withdrawalToDetail === 'object' ? (
-                <dl className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-                  {Object.entries(viewDetailWithdrawal.withdrawalToDetail).map(([key, value]) => {
-                    const keyNorm = key.toLowerCase().replace(/_/g, '')
-                    if (keyNorm === 'accountid' || keyNorm === 'isdefaultforwithdrawal') return null
-                    if (value == null || (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0)) return null
-                    const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase()).trim()
-                    const display = typeof value === 'object' && value !== null && !(value instanceof Date)
-                      ? JSON.stringify(value)
-                      : String(value)
-                    return (
-                      <React.Fragment key={key}>
-                        <dt className="text-gray-500">{label}</dt>
-                        <dd className="text-gray-900 break-all">{display}</dd>
-                      </React.Fragment>
-                    )
-                  })}
-                </dl>
-              ) : (
-                <p className="text-gray-500 text-sm">No bank details available.</p>
-              )}
+
+            {/* User section */}
+            <div className="rounded-xl border border-gray-200 bg-gray-50/50 overflow-hidden">
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 bg-white">
+                <div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center text-teal-600">
+                  <HiUser className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">User details</h3>
+                  <p className="text-xs text-gray-500">Applicant information</p>
+                </div>
+              </div>
+              <div className="p-4">
+                {viewDetailWithdrawal.userId ? (
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                    {viewDetailWithdrawal.userId.fullName != null && (
+                      <div>
+                        <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">Full name</dt>
+                        <dd className="text-gray-900 font-medium">{viewDetailWithdrawal.userId.fullName}</dd>
+                      </div>
+                    )}
+                    {viewDetailWithdrawal.userId.mobile != null && (
+                      <div>
+                        <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">Mobile</dt>
+                        <dd className="text-gray-900">{viewDetailWithdrawal.userId.mobile}</dd>
+                      </div>
+                    )}
+                    {viewDetailWithdrawal.userId.email != null && (
+                      <div>
+                        <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">Email</dt>
+                        <dd className="text-gray-900 break-all">{viewDetailWithdrawal.userId.email}</dd>
+                      </div>
+                    )}
+                    {viewDetailWithdrawal.userId._id != null && (
+                      <div className="sm:col-span-2">
+                        <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">User ID</dt>
+                        <dd className="text-gray-900 font-mono text-xs break-all mt-0.5 p-2 rounded-lg bg-white border border-gray-100">{viewDetailWithdrawal.userId._id}</dd>
+                      </div>
+                    )}
+                  </dl>
+                ) : (
+                  <p className="text-gray-500 text-sm py-2">No user details available.</p>
+                )}
+              </div>
             </div>
-            <div className="pt-2 border-t border-gray-200 flex justify-end">
+
+            {/* Bank / withdrawal to section */}
+            <div className="rounded-xl border border-gray-200 bg-gray-50/50 overflow-hidden">
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 bg-white">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600">
+                  <HiCreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Bank & payout details</h3>
+                  <p className="text-xs text-gray-500">Withdrawal destination</p>
+                </div>
+              </div>
+              <div className="p-4">
+                {viewDetailWithdrawal.withdrawalToDetail && typeof viewDetailWithdrawal.withdrawalToDetail === 'object' ? (
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                    {Object.entries(viewDetailWithdrawal.withdrawalToDetail).map(([key, value]) => {
+                      const keyNorm = key.toLowerCase().replace(/_/g, '')
+                      if (keyNorm === 'accountid' || keyNorm === 'isdefaultforwithdrawal') return null
+                      if (value == null || (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0)) return null
+                      const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase()).trim()
+                      const display = typeof value === 'object' && value !== null && !(value instanceof Date)
+                        ? JSON.stringify(value)
+                        : String(value)
+                      return (
+                        <div key={key}>
+                          <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">{label}</dt>
+                          <dd className="text-gray-900 break-all">{display}</dd>
+                        </div>
+                      )
+                    })}
+                  </dl>
+                ) : (
+                  <p className="text-gray-500 text-sm py-2">No bank details available.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end pt-2">
               <button
                 type="button"
                 onClick={() => setViewDetailWithdrawal(null)}
-                className="px-4 py-2 rounded-xl bg-teal-500 text-white text-sm font-medium hover:bg-teal-600"
+                className="px-5 py-2.5 rounded-xl bg-teal-500 text-white text-sm font-semibold hover:bg-teal-600 focus:ring-2 focus:ring-teal-500/50 focus:outline-none transition-colors shadow-sm"
               >
                 Close
               </button>

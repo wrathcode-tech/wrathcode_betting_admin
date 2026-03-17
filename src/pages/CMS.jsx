@@ -120,7 +120,7 @@ export default function CMS() {
 
   return (
     <div className="space-y-0">
-      <PageBanner title="Content Management" subtitle="Banners, announcements & static pages — manage in one place – PlayAdd / BetFury" icon={HiCollection} />
+      <PageBanner title="Content Management" subtitle="Banners, announcements & static pages — manage in one place" icon={HiCollection} />
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-6">

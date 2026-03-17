@@ -65,12 +65,15 @@ function buildGamesCards(games) {
     { label: 'Inactive Games', value: formatCount(games.inactiveCount), unit: '', icon: HiCollection, borderColor: 'border-gray-400', iconBg: 'bg-gray-400/10', iconColor: 'text-gray-600' },
   ]
 }
-const BETS = [
-  { label: 'Total Bets', value: '1,24,892', unit: '', icon: HiHashtag, borderColor: 'border-purple-500', iconBg: 'bg-purple-500/10', iconColor: 'text-purple-600' },
-  { label: 'Bets Today', value: '8,421', unit: '', icon: HiHashtag, borderColor: 'border-fuchsia-500', iconBg: 'bg-fuchsia-500/10', iconColor: 'text-fuchsia-600' },
-  { label: 'Bets (7d)', value: '42,156', unit: '', icon: HiHashtag, borderColor: 'border-pink-500', iconBg: 'bg-pink-500/10', iconColor: 'text-pink-600' },
-  { label: 'Bets (30d)', value: '1,18,420', unit: '', icon: HiHashtag, borderColor: 'border-rose-500', iconBg: 'bg-rose-500/10', iconColor: 'text-rose-600' },
-]
+function buildBetsCards(stats) {
+  if (!stats) return []
+  return [
+    { label: 'Total Bet Amount', value: formatAmount(stats.totalBetAmount), unit: '', icon: HiHashtag, borderColor: 'border-purple-500', iconBg: 'bg-purple-500/10', iconColor: 'text-purple-600' },
+    { label: 'Bet Amount Today', value: formatAmount(stats.todayBetAmount), unit: '', icon: HiHashtag, borderColor: 'border-fuchsia-500', iconBg: 'bg-fuchsia-500/10', iconColor: 'text-fuchsia-600' },
+    { label: 'Bet Amount (7d)', value: formatAmount(stats.betAmount7d), unit: '', icon: HiHashtag, borderColor: 'border-pink-500', iconBg: 'bg-pink-500/10', iconColor: 'text-pink-600' },
+    { label: 'Bet Amount (30d)', value: formatAmount(stats.betAmount30d), unit: '', icon: HiHashtag, borderColor: 'border-rose-500', iconBg: 'bg-rose-500/10', iconColor: 'text-rose-600' },
+  ]
+}
 const BONUSES = [
   { label: 'Total Bonus Issued', value: '₹8.5L', unit: '', icon: HiGift, borderColor: 'border-pink-500', iconBg: 'bg-pink-500/10', iconColor: 'text-pink-600' },
   { label: 'Bonus Claimed', value: '₹6.2L', unit: '', icon: HiGift, borderColor: 'border-rose-500', iconBg: 'bg-rose-500/10', iconColor: 'text-rose-600' },
@@ -142,6 +145,8 @@ export default function Dashboard() {
   const [dashboardData, setDashboardData] = useState(null)
   const [dashboardLoading, setDashboardLoading] = useState(true)
   const [dashboardError, setDashboardError] = useState(null)
+  const [betsAmountStats, setBetsAmountStats] = useState(null)
+  const [betsAmountStatsLoading, setBetsAmountStatsLoading] = useState(true)
 
   const canViewUsers = hasPermission(PERMISSIONS.VIEW_USERS)
   const canViewDeposits = hasPermission(PERMISSIONS.VIEW_DEPOSITS)
@@ -171,10 +176,25 @@ export default function Dashboard() {
       .finally(() => setDashboardLoading(false))
   }, [])
 
+  useEffect(() => {
+    setBetsAmountStatsLoading(true)
+    AuthService.getMasterBetsAmountStats()
+      .then((res) => {
+        if (res?.success && res?.data) {
+          setBetsAmountStats(res.data)
+        } else {
+          setBetsAmountStats(null)
+        }
+      })
+      .catch(() => setBetsAmountStats(null))
+      .finally(() => setBetsAmountStatsLoading(false))
+  }, [])
+
   const usersCards = buildUsersCards(dashboardData?.users)
   const depositCards = buildDepositCards(dashboardData?.deposit)
   const withdrawalCards = buildWithdrawalCards(dashboardData?.withdrawal)
   const gamesCards = buildGamesCards(dashboardData?.games)
+  const betsCards = buildBetsCards(betsAmountStats)
 
   function fetchAdminLogs(page = 1, activity = '') {
     setAdminLogsLoading(true)
@@ -257,8 +277,14 @@ export default function Dashboard() {
         />
       )}
 
-      {/* BETS */}
-      {(canViewGames || canViewReports) && <Section title="Bets" cards={BETS} />}
+      {/* BETS – GET /api/v1/master/bets/amount-stats */}
+      {(canViewGames || canViewReports) && (
+        <Section
+          title="Bets"
+          cards={betsAmountStatsLoading ? [] : betsCards}
+          loading={betsAmountStatsLoading}
+        />
+      )}
 
       {/* BONUSES */}
       {canViewBonuses && <Section title="Bonuses" cards={BONUSES} />}

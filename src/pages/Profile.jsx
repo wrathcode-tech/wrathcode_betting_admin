@@ -13,7 +13,7 @@ export default function Profile() {
 
   return (
     <div className="space-y-6">
-      <PageBanner title="My Profile" subtitle="Your account details – PlayAdd / BetFury" icon={HiUser} />
+      <PageBanner title="My Profile" subtitle="Your account details" icon={HiUser} />
 
       <div className="max-w-lg">
         <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-6">
