@@ -14,6 +14,7 @@ import {
   HiGift,
   HiSupport,
   HiRefresh,
+  HiCash,
 } from 'react-icons/hi'
 import PageBanner from '../components/PageBanner'
 import { useAuth } from '../context/AuthContext'
@@ -79,10 +80,31 @@ const BONUSES = [
   { label: 'Bonus Claimed', value: '₹6.2L', unit: '', icon: HiGift, borderColor: 'border-rose-500', iconBg: 'bg-rose-500/10', iconColor: 'text-rose-600' },
   { label: 'Bonus Pending', value: '₹2.3L', unit: '', icon: HiGift, borderColor: 'border-violet-500', iconBg: 'bg-violet-500/10', iconColor: 'text-violet-600' },
 ]
-const SUPPORT = [
-  { label: 'Open Tickets', value: '8', unit: '', icon: HiSupport, borderColor: 'border-blue-500', iconBg: 'bg-blue-500/10', iconColor: 'text-blue-600' },
-  { label: 'Resolved Today', value: '14', unit: '', icon: HiSupport, borderColor: 'border-cyan-500', iconBg: 'bg-cyan-500/10', iconColor: 'text-cyan-600' },
-]
+/** Build Support cards from GET /api/v1/master/support-ticket-counts */
+function buildSupportCards(counts) {
+  if (!counts || typeof counts !== 'object') return []
+  return [
+    { label: 'Open', value: formatCount(counts.open), unit: '', icon: HiSupport, borderColor: 'border-blue-500', iconBg: 'bg-blue-500/10', iconColor: 'text-blue-600' },
+    { label: 'In Progress', value: formatCount(counts.inProgress), unit: '', icon: HiSupport, borderColor: 'border-amber-500', iconBg: 'bg-amber-500/10', iconColor: 'text-amber-600' },
+    { label: 'Resolved', value: formatCount(counts.resolved), unit: '', icon: HiSupport, borderColor: 'border-cyan-500', iconBg: 'bg-cyan-500/10', iconColor: 'text-cyan-600' },
+  ]
+}
+
+/** Build Admin Stats cards from GET /api/v1/master/admin-profit-summary */
+function buildAdminStatsCards(data) {
+  if (!data || typeof data !== 'object') return []
+  const profitStyle = data.inProfit
+    ? { borderColor: 'border-emerald-500', iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-600' }
+    : data.inLoss
+      ? { borderColor: 'border-red-500', iconBg: 'bg-red-500/10', iconColor: 'text-red-600' }
+      : { borderColor: 'border-gray-500', iconBg: 'bg-gray-500/10', iconColor: 'text-gray-600' }
+  return [
+    { label: 'Total Deposits', value: formatAmount(data.totalDeposits), unit: '', icon: HiArrowDown, borderColor: 'border-green-500', iconBg: 'bg-green-500/10', iconColor: 'text-green-600' },
+    { label: 'Total Withdrawals', value: formatAmount(data.totalWithdrawals), unit: '', icon: HiArrowUp, borderColor: 'border-orange-500', iconBg: 'bg-orange-500/10', iconColor: 'text-orange-600' },
+    { label: 'Total Wallet Balance', value: formatAmount(data.totalWalletBalance), unit: '', icon: HiCash, borderColor: 'border-indigo-500', iconBg: 'bg-indigo-500/10', iconColor: 'text-indigo-600' },
+    { label: 'Profit', value: formatAmount(data.profit), unit: '', icon: HiChartBar, ...profitStyle },
+  ]
+}
 
 function formatLogDateTime(iso) {
   if (!iso) return '–'
@@ -147,6 +169,10 @@ export default function Dashboard() {
   const [dashboardError, setDashboardError] = useState(null)
   const [betsAmountStats, setBetsAmountStats] = useState(null)
   const [betsAmountStatsLoading, setBetsAmountStatsLoading] = useState(true)
+  const [supportTicketCounts, setSupportTicketCounts] = useState(null)
+  const [supportTicketCountsLoading, setSupportTicketCountsLoading] = useState(true)
+  const [adminProfitSummary, setAdminProfitSummary] = useState(null)
+  const [adminProfitSummaryLoading, setAdminProfitSummaryLoading] = useState(true)
 
   const canViewUsers = hasPermission(PERMISSIONS.VIEW_USERS)
   const canViewDeposits = hasPermission(PERMISSIONS.VIEW_DEPOSITS)
@@ -190,11 +216,42 @@ export default function Dashboard() {
       .finally(() => setBetsAmountStatsLoading(false))
   }, [])
 
+  useEffect(() => {
+    if (!canViewTickets) return
+    setSupportTicketCountsLoading(true)
+    AuthService.getMasterSupportTicketCounts()
+      .then((res) => {
+        if (res?.success && res?.data) {
+          setSupportTicketCounts(res.data)
+        } else {
+          setSupportTicketCounts(null)
+        }
+      })
+      .catch(() => setSupportTicketCounts(null))
+      .finally(() => setSupportTicketCountsLoading(false))
+  }, [canViewTickets])
+
+  useEffect(() => {
+    setAdminProfitSummaryLoading(true)
+    AuthService.getMasterAdminProfitSummary()
+      .then((res) => {
+        if (res?.success && res?.data) {
+          setAdminProfitSummary(res.data)
+        } else {
+          setAdminProfitSummary(null)
+        }
+      })
+      .catch(() => setAdminProfitSummary(null))
+      .finally(() => setAdminProfitSummaryLoading(false))
+  }, [])
+
   const usersCards = buildUsersCards(dashboardData?.users)
   const depositCards = buildDepositCards(dashboardData?.deposit)
   const withdrawalCards = buildWithdrawalCards(dashboardData?.withdrawal)
   const gamesCards = buildGamesCards(dashboardData?.games)
   const betsCards = buildBetsCards(betsAmountStats)
+  const supportCards = buildSupportCards(supportTicketCounts)
+  const adminStatsCards = buildAdminStatsCards(adminProfitSummary)
 
   function fetchAdminLogs(page = 1, activity = '') {
     setAdminLogsLoading(true)
@@ -240,6 +297,13 @@ export default function Dashboard() {
           {dashboardError}
         </div>
       )}
+
+      {/* Admin Stats – GET /api/v1/master/admin-profit-summary */}
+      <Section
+        title="Admin Stats"
+        cards={adminProfitSummaryLoading ? [] : adminStatsCards}
+        loading={adminProfitSummaryLoading}
+      />
 
       {/* USERS & PLAYERS – from GET /api/v1/master/dashboard */}
       {canViewUsers && (
@@ -289,8 +353,14 @@ export default function Dashboard() {
       {/* BONUSES */}
       {canViewBonuses && <Section title="Bonuses" cards={BONUSES} />}
 
-      {/* SUPPORT */}
-      {canViewTickets && <Section title="Support" cards={SUPPORT} />}
+      {/* SUPPORT – GET /api/v1/master/support-ticket-counts */}
+      {canViewTickets && (
+        <Section
+          title="Support"
+          cards={supportTicketCountsLoading ? [] : supportCards}
+          loading={supportTicketCountsLoading}
+        />
+      )}
 
       {/* Login & Activity – GET /api/v1/master/admin-logs */}
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">

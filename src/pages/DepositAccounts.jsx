@@ -32,6 +32,7 @@ const TYPE_OPTIONS = [
   { value: '', label: 'All types' },
   { value: 'bank', label: 'Bank' },
   { value: 'upi', label: 'UPI' },
+  { value: 'crypto', label: 'Crypto' },
 ]
 const IS_ACTIVE_OPTIONS = [
   { value: '', label: 'All' },
@@ -50,6 +51,8 @@ const defaultForm = {
   upiId: '',
   upiName: '',
   qrImage: '',
+  cryptoAddress: '',
+  cryptoChain: '',
   minDeposit: '',
   maxDeposit: '',
   displayOrder: '',
@@ -66,6 +69,11 @@ function buildPayload(form) {
     payload.accountHolderName = form.accountHolderName?.trim() || ''
     payload.accountNumber = form.accountNumber?.trim() || ''
     payload.ifscCode = form.ifscCode?.trim() || ''
+  } else if (form.type === 'crypto') {
+    payload.cryptoAddress = form.cryptoAddress?.trim() || ''
+    payload.cryptoChain = form.cryptoChain?.trim() || ''
+    if (form.minDeposit !== '' && form.minDeposit != null) payload.minDeposit = Number(form.minDeposit) || 0
+    if (form.maxDeposit !== '' && form.maxDeposit != null) payload.maxDeposit = Number(form.maxDeposit) || 0
   } else {
     payload.upiId = form.upiId?.trim() || ''
     payload.upiName = form.upiName?.trim() || ''
@@ -93,6 +101,8 @@ function accountToForm(acc) {
     upiId: acc.upiId ?? '',
     upiName: acc.upiName ?? '',
     qrImage: acc.qrImage ?? '',
+    cryptoAddress: acc.cryptoAddress ?? '',
+    cryptoChain: acc.cryptoChain ?? '',
     minDeposit: acc.minDeposit != null ? String(acc.minDeposit) : '',
     maxDeposit: acc.maxDeposit != null ? String(acc.maxDeposit) : '',
     displayOrder: acc.displayOrder != null ? String(acc.displayOrder) : '',
@@ -181,6 +191,10 @@ export default function DepositAccounts() {
       addToast('Fill UPI ID and UPI Name', 'error')
       return
     }
+    if (form.type === 'crypto' && !form.cryptoAddress?.trim()) {
+      addToast('Fill crypto address', 'error')
+      return
+    }
     setSubmitLoading(true)
     AuthService.postMasterDepositAccount(buildPayload(form))
       .then((res) => {
@@ -206,6 +220,10 @@ export default function DepositAccounts() {
     }
     if (form.type === 'upi' && (!form.upiId?.trim() || !form.upiName?.trim())) {
       addToast('Fill UPI ID and UPI Name', 'error')
+      return
+    }
+    if (form.type === 'crypto' && !form.cryptoAddress?.trim()) {
+      addToast('Fill crypto address', 'error')
       return
     }
     setSubmitLoading(true)
@@ -263,12 +281,12 @@ export default function DepositAccounts() {
 
   return (
     <div className="space-y-6">
-      <PageBanner title="Deposit Accounts" subtitle="Bank & UPI accounts for receiving deposits" icon={HiCreditCard} />
+      <PageBanner title="Deposit Accounts" subtitle="Bank, UPI & Crypto accounts for receiving deposits" icon={HiCreditCard} />
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-2 rounded-xl bg-gray-100 border border-gray-200 px-4 py-3">
           <HiCreditCard className="w-5 h-5 text-teal-600" />
-          <span className="font-semibold text-gray-800">Bank & UPI List</span>
+          <span className="font-semibold text-gray-800">Bank, UPI & Crypto List</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-500">{loading ? '…' : `${total} accounts`}</span>
@@ -339,16 +357,16 @@ export default function DepositAccounts() {
                 accounts.map((acc) => (
                   <tr key={acc._id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-4 px-4">
-                      <span className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-medium ${acc.type === 'upi' ? 'bg-violet-100 text-violet-700' : 'bg-teal-100 text-teal-700'}`}>
-                        {acc.type === 'upi' ? 'UPI' : 'Bank'}
+                      <span className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-medium ${acc.type === 'upi' ? 'bg-violet-100 text-violet-700' : acc.type === 'crypto' ? 'bg-amber-100 text-amber-700' : 'bg-teal-100 text-teal-700'}`}>
+                        {acc.type === 'upi' ? 'UPI' : acc.type === 'crypto' ? 'Crypto' : 'Bank'}
                       </span>
                     </td>
                     <td className="py-4 px-4 text-sm text-gray-700">{acc.ownerType || '–'}</td>
                     <td className="py-4 px-4 text-sm font-medium text-gray-900">
-                      {acc.type === 'bank' ? (acc.accountHolderName || '–') : (acc.upiName || '–')}
+                      {acc.type === 'bank' ? (acc.accountHolderName || '–') : acc.type === 'crypto' ? (acc.cryptoChain || '–') : (acc.upiName || '–')}
                     </td>
                     <td className="py-4 px-4 text-sm text-gray-900 font-mono">
-                      {acc.type === 'bank' ? (acc.accountNumber ? `****${String(acc.accountNumber).slice(-4)}` : '–') : (acc.upiId || '–')}
+                      {acc.type === 'bank' ? (acc.accountNumber ? `****${String(acc.accountNumber).slice(-4)}` : '–') : acc.type === 'crypto' ? (acc.cryptoAddress ? `${String(acc.cryptoAddress).slice(0, 10)}...${String(acc.cryptoAddress).slice(-8)}` : '–') : (acc.upiId || '–')}
                     </td>
                     <td className="py-4 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -373,7 +391,7 @@ export default function DepositAccounts() {
                             <button type="button" onClick={() => openEdit(acc)} className="p-2 rounded-lg text-teal-600 hover:bg-teal-50" title="Edit">
                               <HiPencil className="w-4 h-4" />
                             </button>
-                            <button type="button" onClick={() => setDeleteConfirm({ id: acc._id, name: acc.bankName || acc.upiId || acc._id })} className="p-2 rounded-lg text-red-500 hover:bg-red-50" title="Delete">
+                            <button type="button" onClick={() => setDeleteConfirm({ id: acc._id, name: acc.bankName || acc.upiId || acc.cryptoAddress || acc._id })} className="p-2 rounded-lg text-red-500 hover:bg-red-50" title="Delete">
                               <HiTrash className="w-4 h-4" />
                             </button>
                           </>
@@ -410,7 +428,7 @@ export default function DepositAccounts() {
         {viewAccount && (
           <div className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-              <div><span className="text-gray-500 block mb-0.5">Type</span><span className="font-medium text-gray-900">{viewAccount.type === 'upi' ? 'UPI' : 'Bank'}</span></div>
+              <div><span className="text-gray-500 block mb-0.5">Type</span><span className="font-medium text-gray-900">{viewAccount.type === 'upi' ? 'UPI' : viewAccount.type === 'crypto' ? 'Crypto' : 'Bank'}</span></div>
               <div><span className="text-gray-500 block mb-0.5">Owner type</span><span className="font-medium text-gray-900">{viewAccount.ownerType || '–'}</span></div>
               {viewAccount.branchId != null && viewAccount.branchId !== '' && (
                 <div className="sm:col-span-2"><span className="text-gray-500 block mb-0.5">Branch ID</span><span className="font-medium text-gray-900">{viewAccount.branchId}</span></div>
@@ -426,6 +444,16 @@ export default function DepositAccounts() {
                   <div><dt className="text-gray-500">Account holder name</dt><dd className="font-medium text-gray-900">{viewAccount.accountHolderName || '–'}</dd></div>
                   <div><dt className="text-gray-500">Account number</dt><dd className="font-mono text-gray-900">{viewAccount.accountNumber || '–'}</dd></div>
                   <div><dt className="text-gray-500">IFSC code</dt><dd className="font-mono text-gray-900">{viewAccount.ifscCode || '–'}</dd></div>
+                </dl>
+              </div>
+            ) : viewAccount.type === 'crypto' ? (
+              <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 space-y-3">
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Crypto details</h4>
+                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                  <div className="sm:col-span-2"><dt className="text-gray-500">Address</dt><dd className="font-mono text-gray-900 break-all">{viewAccount.cryptoAddress || '–'}</dd></div>
+                  <div><dt className="text-gray-500">Chain</dt><dd className="font-medium text-gray-900">{viewAccount.cryptoChain || '–'}</dd></div>
+                  {viewAccount.minDeposit != null && <div><dt className="text-gray-500">Min deposit</dt><dd className="text-gray-900">₹{Number(viewAccount.minDeposit).toLocaleString('en-IN')}</dd></div>}
+                  {viewAccount.maxDeposit != null && <div><dt className="text-gray-500">Max deposit</dt><dd className="text-gray-900">₹{Number(viewAccount.maxDeposit).toLocaleString('en-IN')}</dd></div>}
                 </dl>
               </div>
             ) : (
@@ -462,6 +490,7 @@ export default function DepositAccounts() {
             <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))} className={inputClass} disabled={submitLoading}>
               <option value="bank">Bank</option>
               <option value="upi">UPI</option>
+              <option value="crypto">Crypto</option>
             </select>
           </div>
           <div>
@@ -483,6 +512,15 @@ export default function DepositAccounts() {
               <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Account holder name</label><input type="text" value={form.accountHolderName} onChange={(e) => setForm((f) => ({ ...f, accountHolderName: e.target.value }))} className={inputClass} required disabled={submitLoading} /></div>
               <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Account number</label><input type="text" value={form.accountNumber} onChange={(e) => setForm((f) => ({ ...f, accountNumber: e.target.value }))} className={inputClass} required disabled={submitLoading} /></div>
               <div><label className="block text-sm font-medium text-gray-700 mb-1.5">IFSC code</label><input type="text" value={form.ifscCode} onChange={(e) => setForm((f) => ({ ...f, ifscCode: e.target.value }))} className={inputClass} required disabled={submitLoading} /></div>
+            </>
+          ) : form.type === 'crypto' ? (
+            <>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Crypto address</label><input type="text" value={form.cryptoAddress} onChange={(e) => setForm((f) => ({ ...f, cryptoAddress: e.target.value }))} className={inputClass} placeholder="0x..." required disabled={submitLoading} /></div>
+              <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Chain (optional)</label><input type="text" value={form.cryptoChain} onChange={(e) => setForm((f) => ({ ...f, cryptoChain: e.target.value }))} className={inputClass} placeholder="e.g. BEP20, ERC20" disabled={submitLoading} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Min deposit</label><input type="number" min="0" value={form.minDeposit} onChange={(e) => setForm((f) => ({ ...f, minDeposit: e.target.value }))} className={inputClass} disabled={submitLoading} /></div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Max deposit</label><input type="number" min="0" value={form.maxDeposit} onChange={(e) => setForm((f) => ({ ...f, maxDeposit: e.target.value }))} className={inputClass} disabled={submitLoading} /></div>
+              </div>
             </>
           ) : (
             <>
@@ -515,6 +553,7 @@ export default function DepositAccounts() {
               <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))} className={inputClass} disabled={submitLoading}>
                 <option value="bank">Bank</option>
                 <option value="upi">UPI</option>
+                <option value="crypto">Crypto</option>
               </select>
             </div>
             <div>
@@ -536,6 +575,15 @@ export default function DepositAccounts() {
                 <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Account holder name</label><input type="text" value={form.accountHolderName} onChange={(e) => setForm((f) => ({ ...f, accountHolderName: e.target.value }))} className={inputClass} required disabled={submitLoading} /></div>
                 <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Account number</label><input type="text" value={form.accountNumber} onChange={(e) => setForm((f) => ({ ...f, accountNumber: e.target.value }))} className={inputClass} required disabled={submitLoading} /></div>
                 <div><label className="block text-sm font-medium text-gray-700 mb-1.5">IFSC code</label><input type="text" value={form.ifscCode} onChange={(e) => setForm((f) => ({ ...f, ifscCode: e.target.value }))} className={inputClass} required disabled={submitLoading} /></div>
+              </>
+            ) : form.type === 'crypto' ? (
+              <>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Crypto address</label><input type="text" value={form.cryptoAddress} onChange={(e) => setForm((f) => ({ ...f, cryptoAddress: e.target.value }))} className={inputClass} required disabled={submitLoading} /></div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Chain (optional)</label><input type="text" value={form.cryptoChain} onChange={(e) => setForm((f) => ({ ...f, cryptoChain: e.target.value }))} className={inputClass} placeholder="e.g. BEP20, ERC20" disabled={submitLoading} /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Min deposit</label><input type="number" min="0" value={form.minDeposit} onChange={(e) => setForm((f) => ({ ...f, minDeposit: e.target.value }))} className={inputClass} disabled={submitLoading} /></div>
+                  <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Max deposit</label><input type="number" min="0" value={form.maxDeposit} onChange={(e) => setForm((f) => ({ ...f, maxDeposit: e.target.value }))} className={inputClass} disabled={submitLoading} /></div>
+                </div>
               </>
             ) : (
               <>

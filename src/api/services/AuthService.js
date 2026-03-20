@@ -21,6 +21,16 @@ const AuthService = {
     return ApiCallGet(url, headers);
   },
 
+  /** GET /api/v1/master/admin-profit-summary → { success, data: { totalDeposits, totalWithdrawals, totalWalletBalance, profit, inProfit, inLoss, breakEven } } */
+  getMasterAdminProfitSummary: async () => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterAdminProfitSummary } = ApiConfig;
+    const url = `${baseUrl}${masterAdminProfitSummary}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
   /** GET /api/v1/master/admin-logs?page=1&limit=20&activity=login → { success, data: { logs, pagination } } */
   getMasterAdminLogs: async (params = {}) => {
     const token = sessionStorage.getItem("token");
@@ -32,6 +42,16 @@ const AuthService = {
     if (params.activity) q.set("activity", params.activity);
     const query = q.toString();
     const url = `${baseUrl}${masterAdminLogs}${query ? `?${query}` : ""}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
+  },
+
+  /** GET /api/v1/master/support-ticket-counts → { success, data: { open, inProgress, resolved, closed, total } } */
+  getMasterSupportTicketCounts: async () => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterSupportTicketCounts } = ApiConfig;
+    const url = `${baseUrl}${masterSupportTicketCounts}`;
     const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
     return ApiCallGet(url, headers);
   },

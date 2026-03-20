@@ -9,6 +9,7 @@ export const ApiConfig = {
   masterLogin: "/api/v1/master/login",
   masterDashboard: "/api/v1/master/dashboard",
   masterAdminLogs: "/api/v1/master/admin-logs",
+  masterAdminProfitSummary: "/api/v1/master/admin-profit-summary",
   masterUsers: "/api/v1/master/users",
   masterDepositRequests: "/api/v1/master/deposit-requests",
   masterWithdrawalRequests: "/api/v1/master/withdrawal-requests",
@@ -25,5 +26,6 @@ export const ApiConfig = {
   masterCasinoGameHistory: "/api/v1/master/casino-game-history",
   masterSubAdmin: "/api/v1/master/sub-admin",
   masterNotifications: "/api/v1/master/notifications",
+  masterSupportTicketCounts: "/api/v1/master/support-ticket-counts",
   supportAdmin: "/api/v1/support/admin",
 };

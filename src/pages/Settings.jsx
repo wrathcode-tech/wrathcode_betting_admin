@@ -102,6 +102,7 @@ const defaultSettings = {
     maxWithdrawalFiatPerDay: 100000,
     newAccountWithdrawalHoldHours: 24,
     bonusPercentage: 10,
+    usdtPrice: 0,
   },
   fiatCurrencies: [{ code: 'INR', enabled: true, minDeposit: 100 }, { code: 'USD', enabled: true, minDeposit: 10 }],
 }
@@ -267,6 +268,7 @@ export default function Settings() {
       bonusPercentage: Number(limits.bonusPercentage) || 0,
       minWithdrawalLimit: Number(limits.minWithdrawalFiat) || 0,
       maxWithdrawalLimit: Number(limits.maxWithdrawalFiatPerDay) || 0,
+      usdtPrice: Number(limits.usdtPrice) || 0,
     }
     AuthService.patchMasterTransactionLimits(payload)
       .then((res) => {
@@ -535,6 +537,18 @@ export default function Settings() {
                 step="1"
                 value={form.limits?.maxWithdrawalFiatPerDay ?? defaultSettings.limits.maxWithdrawalFiatPerDay}
                 onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, maxWithdrawalFiatPerDay: Number(e.target.value) || 0 } }))}
+                disabled={!canEdit}
+                className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">USDT Price (₹)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.limits?.usdtPrice ?? defaultSettings.limits.usdtPrice}
+                onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, usdtPrice: Number(e.target.value) || 0 } }))}
                 disabled={!canEdit}
                 className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
               />
