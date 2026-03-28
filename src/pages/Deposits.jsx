@@ -9,6 +9,7 @@ import Badge from '../components/ui/Badge'
 import Modal from '../components/Modal'
 import { useToast } from '../context/ToastContext'
 import AuthService from '../api/services/AuthService'
+import { ApiConfig } from '../api/apiConfig/apiConfig'
 
 const TABS = [
   { id: 'all', label: 'All' },
@@ -45,6 +46,13 @@ function getDepositUserId(deposit) {
   return typeof u === 'string' ? u : u._id
 }
 
+function getPaymentProofUrl(path) {
+  if (!path) return ''
+  if (/^https?:\/\//i.test(path)) return path
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return `${ApiConfig.baseUrl}${normalizedPath}`
+}
+
 export default function Deposits() {
   const [deposits, setDeposits] = useState([])
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 })
@@ -57,6 +65,7 @@ export default function Deposits() {
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [selectedDeposit, setSelectedDeposit] = useState(null)
+  const [proofPreviewUrl, setProofPreviewUrl] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
   const { addToast } = useToast()
 
@@ -102,13 +111,13 @@ export default function Deposits() {
 
   const filtered = search.trim()
     ? deposits.filter(
-        (d) =>
-          (d.utrNumber && String(d.utrNumber).toLowerCase().includes(search.toLowerCase())) ||
-          (d._id && String(d._id).toLowerCase().includes(search.toLowerCase())) ||
-          (d.userId?.mobile && d.userId.mobile.includes(search)) ||
-          (d.userId?.fullName && d.userId.fullName.toLowerCase().includes(search.toLowerCase())) ||
-          (d.userId?.email && d.userId.email.toLowerCase().includes(search.toLowerCase()))
-      )
+      (d) =>
+        (d.utrNumber && String(d.utrNumber).toLowerCase().includes(search.toLowerCase())) ||
+        (d._id && String(d._id).toLowerCase().includes(search.toLowerCase())) ||
+        (d.userId?.mobile && d.userId.mobile.includes(search)) ||
+        (d.userId?.fullName && d.userId.fullName.toLowerCase().includes(search.toLowerCase())) ||
+        (d.userId?.email && d.userId.email.toLowerCase().includes(search.toLowerCase()))
+    )
     : deposits
 
   const badgeVariant = (status) => {
@@ -158,10 +167,6 @@ export default function Deposits() {
   }
 
   const handleRejectConfirm = () => {
-    if (!rejectReason.trim()) {
-      addToast('Please enter a reject reason', 'error')
-      return
-    }
     if (!selectedDeposit) return
     const userId = getDepositUserId(selectedDeposit)
     if (!userId) {
@@ -169,13 +174,16 @@ export default function Deposits() {
       return
     }
     const reason = rejectReason.trim().slice(0, 500)
-    setActionLoading(true)
-    AuthService.patchMasterDepositRequest(selectedDeposit._id, {
+    const payload = {
       status: 'rejected',
       userId,
-      rejectReason: reason,
-      adminRemarks: reason,
-    })
+    }
+    if (reason) {
+      payload.rejectReason = reason
+      payload.adminRemarks = reason
+    }
+    setActionLoading(true)
+    AuthService.patchMasterDepositRequest(selectedDeposit._id, payload)
       .then((res) => {
         if (res?.success) {
           addToast(res.message || 'Deposit rejected', 'success')
@@ -242,9 +250,8 @@ export default function Deposits() {
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2.5 rounded-t-xl text-sm font-medium transition-colors ${
-              activeTab === tab.id ? 'bg-teal-50 text-teal-700 border-b-2 border-teal-500 -mb-px' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
+            className={`px-4 py-2.5 rounded-t-xl text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-teal-50 text-teal-700 border-b-2 border-teal-500 -mb-px' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
           >
             {tab.label}
             {activeTab === tab.id && (
@@ -285,6 +292,7 @@ export default function Deposits() {
               <tr className="border-b border-gray-200 bg-gray-50">
                 <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Transaction ID</th>
                 <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">User ID</th>
+                <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">User Name</th>
                 <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Amount</th>
                 <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">Status</th>
                 <th className="text-left py-4 px-5 text-gray-600 font-semibold text-sm">UTR</th>
@@ -325,11 +333,14 @@ export default function Deposits() {
                   return (
                     <tr key={d._id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-4 px-5 text-teal-600 font-mono text-sm truncate max-w-[120px]" title={d.transactionId
-  }>{d.transactionId
-  }</td>
+                      }>{d.transactionId
+                        }</td>
                       <td className="py-4 px-5 text-gray-900 text-sm">
-                      {u?.uuid && <p className="font-medium">{u.uuid}</p>}
+                        {u?.uuid && <p className="font-medium">{u.uuid}</p>}
                         <p className="text-gray-500 font-mono text-xs mt-0.5">({u?.mobile || u?.email || u?.fullName || '–'})</p>
+                      </td>
+                      <td className="py-4 px-5 text-gray-900 text-sm">
+                        {u?.fullName && <p className="font-medium">{u.fullName}</p>}
                       </td>
                       <td className="py-4 px-5 font-medium text-emerald-600">₹{Number(d.amount ?? 0).toLocaleString()}</td>
                       <td className="py-4 px-5">
@@ -340,9 +351,11 @@ export default function Deposits() {
                         {d.paymentProofUrl ? (
                           <span className="inline-flex items-center gap-1">
                             <img
-                              src={d.paymentProofUrl}
+                              src={getPaymentProofUrl(d.paymentProofUrl)}
+                              crossOrigin="anonymous"
                               alt="Payment proof"
-                              className="h-12 w-12 rounded-lg object-cover border border-gray-200 bg-gray-50 shrink-0"
+                              className="h-12 w-12 rounded-lg object-cover border border-gray-200 bg-gray-50 shrink-0 cursor-pointer"
+                              onClick={() => setProofPreviewUrl(getPaymentProofUrl(d.paymentProofUrl))}
                               onError={(e) => {
                                 e.target.onerror = null
                                 e.target.style.display = 'none'
@@ -429,7 +442,7 @@ export default function Deposits() {
       <Modal open={showRejectModal} onClose={handleRejectClose} title="Reject Deposit Request" size="md">
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Reject Reason <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Reject Reason (optional)</label>
             <textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
@@ -450,6 +463,19 @@ export default function Deposits() {
               {actionLoading ? 'Rejecting…' : 'Confirm Reject'}
             </button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal open={!!proofPreviewUrl} onClose={() => setProofPreviewUrl('')} title="Payment Proof" size="xl">
+        <div className="flex items-center justify-center">
+          {proofPreviewUrl ? (
+            <img
+              src={proofPreviewUrl}
+              crossOrigin="anonymous"
+              alt="Payment proof preview"
+              className="max-h-[75vh] w-auto max-w-full rounded-xl border border-gray-200 bg-gray-50 object-contain"
+            />
+          ) : null}
         </div>
       </Modal>
     </div>

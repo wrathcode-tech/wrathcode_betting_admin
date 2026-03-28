@@ -398,7 +398,7 @@ export default function Bets() {
               ) : (
                 bets.map((b) => (
                   <tr key={b.betId} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td className="py-4 px-5 font-mono text-sm text-teal-600">{b.betId}</td>
+                    <td className="py-4 px-5 font-mono text-sm text-teal-600">{b._id}</td>
                     <td className="py-4 px-5 text-gray-900">{b.user ?? '–'}</td>
                     <td className="py-4 px-5 text-gray-700">{b.upline ?? '–'}</td>
                     <td className="py-4 px-5">
