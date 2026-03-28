@@ -24,7 +24,7 @@ import { useAuth } from '../context/AuthContext'
 import { PERMISSIONS } from '../constants/roles'
 import AuthService from '../api/services/AuthService'
 
-const STORAGE_KEY = 'crownbet-admin-settings'
+const STORAGE_KEY = 'Betgugly-admin-settings'
 
 /** Platform configuration API keys (GET/PATCH /api/v1/master/platform-configuration) ↔ form.serviceControls keys */
 const API_TO_FORM = {
@@ -77,8 +77,8 @@ function formServiceControlsToApi(serviceControls) {
 }
 
 const defaultSettings = {
-  siteName: 'Crownbet',
-  supportEmail: 'support@crownbet.com',
+  siteName: 'Betgugly',
+  supportEmail: 'support@Betgugly.com',
   maintenanceMode: false,
   serviceControls: {
     games: true,
@@ -154,7 +154,7 @@ export default function Settings() {
           fiatCurrencies: parsed.fiatCurrencies || defaultSettings.fiatCurrencies,
         }))
       }
-    } catch (_) {}
+    } catch (_) { }
   }, [])
 
   useEffect(() => {
@@ -193,7 +193,7 @@ export default function Settings() {
         if (res?.success) {
           try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(form))
-          } catch (_) {}
+          } catch (_) { }
           addToast('Configuration saved successfully', 'success')
         } else {
           addToast(res?.message || 'Failed to save settings', 'error')
@@ -277,7 +277,7 @@ export default function Settings() {
             const saved = localStorage.getItem(STORAGE_KEY)
             const parsed = saved ? JSON.parse(saved) : {}
             localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...parsed, limits: { ...defaultSettings.limits, ...form.limits } }))
-          } catch (_) {}
+          } catch (_) { }
           addToast(res?.message || 'Limits saved successfully', 'success')
         } else {
           addToast(res?.message || 'Failed to save limits', 'error')
@@ -302,11 +302,10 @@ export default function Settings() {
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-3 text-sm font-medium rounded-t-xl border-b-2 -mb-px transition-colors ${
-              activeTab === tab.id
+            className={`px-4 py-3 text-sm font-medium rounded-t-xl border-b-2 -mb-px transition-colors ${activeTab === tab.id
                 ? 'border-teal-500 text-teal-600 bg-white border-gray-200'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
+              }`}
           >
             {tab.label}
           </button>
@@ -315,97 +314,93 @@ export default function Settings() {
 
       {/* Tab: Platform Configuration */}
       {activeTab === 'platform' && (
-      <>
-      <form onSubmit={handleSave} className="space-y-6">
-        {/* Full System Maintenance card */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0">
-              <HiExclamation className="w-6 h-6 text-red-500" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-lg font-semibold text-gray-900">Full System Maintenance</h2>
-              <p className="text-sm text-gray-500 mt-0.5">When enabled, the entire platform will be inaccessible to users.</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={form.maintenanceMode}
-              onClick={toggleFullSystemMaintenance}
-              disabled={!canEdit || togglingFullMaintenance}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:cursor-not-allowed ${
-                form.maintenanceMode ? 'bg-teal-500' : 'bg-gray-200'
-              } ${!canEdit ? 'opacity-60' : ''} ${togglingFullMaintenance ? 'opacity-70' : ''}`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
-                  form.maintenanceMode ? 'translate-x-5' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-        </div>
-
-        {/* Service Controls (Instant On/Off) – GET/PATCH /api/v1/master/platform-configuration */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Service Controls (Instant On/Off)</h2>
-          <p className="text-sm text-gray-500 mt-0.5 mb-2">Enable or disable platform functions. Changes apply immediately.</p>
-          {siteSettingsError && (
-            <p className="text-sm text-red-600 mb-4">{siteSettingsError}</p>
-          )}
-          {siteSettingsLoading ? (
-            <p className="text-sm text-gray-500 py-4">Loading platform configuration…</p>
-          ) : (
-            <ul className="space-y-4">
-              {SERVICE_CONTROLS.map(({ key, label, description, icon: Icon }) => (
-                <li key={key} className="flex items-center gap-4 py-3 border-b border-gray-100 last:border-0">
-                  <div className="w-10 h-10 rounded-lg bg-teal-500/10 flex items-center justify-center flex-shrink-0 text-teal-600">
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900">{label}</p>
-                    <p className="text-sm text-gray-500">{description}</p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={form.serviceControls?.[key]}
-                    onClick={() => toggleService(key)}
-                    disabled={!canEdit || togglingKey !== null}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:cursor-not-allowed ${
-                      form.serviceControls?.[key] ? 'bg-teal-500' : 'bg-gray-200'
-                    } ${!canEdit ? 'opacity-60' : ''} ${togglingKey === key ? 'opacity-70' : ''}`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
-                        form.serviceControls?.[key] ? 'translate-x-5' : 'translate-x-1'
+        <>
+          <form onSubmit={handleSave} className="space-y-6">
+            {/* Full System Maintenance card */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                  <HiExclamation className="w-6 h-6 text-red-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg font-semibold text-gray-900">Full System Maintenance</h2>
+                  <p className="text-sm text-gray-500 mt-0.5">When enabled, the entire platform will be inaccessible to users.</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={form.maintenanceMode}
+                  onClick={toggleFullSystemMaintenance}
+                  disabled={!canEdit || togglingFullMaintenance}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:cursor-not-allowed ${form.maintenanceMode ? 'bg-teal-500' : 'bg-gray-200'
+                    } ${!canEdit ? 'opacity-60' : ''} ${togglingFullMaintenance ? 'opacity-70' : ''}`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${form.maintenanceMode ? 'translate-x-5' : 'translate-x-1'
                       }`}
-                    />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+                  />
+                </button>
+              </div>
+            </div>
 
-        {/* Save Configuration button */}
-        <div className="flex justify-center">
-          <button
-            type="submit"
-            disabled={!canEdit || siteSettingsLoading || saving}
-            className="flex items-center justify-center gap-2 w-full max-w-md px-6 py-3.5 rounded-xl bg-teal-500 text-white font-semibold hover:bg-teal-600 focus:ring-2 focus:ring-teal-500/50 focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <HiSave className="w-5 h-5" />
-            {saving ? 'Saving…' : 'Save Configuration'}
-          </button>
-        </div>
-        {!canEdit && (
-          <p className="text-center text-gray-500 text-sm">You need edit permission to change settings.</p>
-        )}
-      </form>
+            {/* Service Controls (Instant On/Off) – GET/PATCH /api/v1/master/platform-configuration */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-900">Service Controls (Instant On/Off)</h2>
+              <p className="text-sm text-gray-500 mt-0.5 mb-2">Enable or disable platform functions. Changes apply immediately.</p>
+              {siteSettingsError && (
+                <p className="text-sm text-red-600 mb-4">{siteSettingsError}</p>
+              )}
+              {siteSettingsLoading ? (
+                <p className="text-sm text-gray-500 py-4">Loading platform configuration…</p>
+              ) : (
+                <ul className="space-y-4">
+                  {SERVICE_CONTROLS.map(({ key, label, description, icon: Icon }) => (
+                    <li key={key} className="flex items-center gap-4 py-3 border-b border-gray-100 last:border-0">
+                      <div className="w-10 h-10 rounded-lg bg-teal-500/10 flex items-center justify-center flex-shrink-0 text-teal-600">
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900">{label}</p>
+                        <p className="text-sm text-gray-500">{description}</p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={form.serviceControls?.[key]}
+                        onClick={() => toggleService(key)}
+                        disabled={!canEdit || togglingKey !== null}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:cursor-not-allowed ${form.serviceControls?.[key] ? 'bg-teal-500' : 'bg-gray-200'
+                          } ${!canEdit ? 'opacity-60' : ''} ${togglingKey === key ? 'opacity-70' : ''}`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${form.serviceControls?.[key] ? 'translate-x-5' : 'translate-x-1'
+                            }`}
+                        />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
-      {/* Schedule a Change card */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+            {/* Save Configuration button */}
+            <div className="flex justify-center">
+              <button
+                type="submit"
+                disabled={!canEdit || siteSettingsLoading || saving}
+                className="flex items-center justify-center gap-2 w-full max-w-md px-6 py-3.5 rounded-xl bg-teal-500 text-white font-semibold hover:bg-teal-600 focus:ring-2 focus:ring-teal-500/50 focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <HiSave className="w-5 h-5" />
+                {saving ? 'Saving…' : 'Save Configuration'}
+              </button>
+            </div>
+            {!canEdit && (
+              <p className="text-center text-gray-500 text-sm">You need edit permission to change settings.</p>
+            )}
+          </form>
+
+          {/* Schedule a Change card */}
+          {/* <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
         <div className="flex items-start gap-4 mb-6">
           <div className="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center flex-shrink-0 text-violet-600">
             <HiCalendar className="w-6 h-6" />
@@ -462,113 +457,113 @@ export default function Settings() {
             Schedule
           </button>
         </form>
-      </div>
-      </>
+      </div> */}
+        </>
       )}
 
       {/* Tab: Settings (limits & bonus) */}
       {activeTab === 'settings' && (
-      <form onSubmit={handleSaveLimits} className="space-y-6">
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0 text-emerald-600">
-              <HiCash className="w-5 h-5" />
+        <form onSubmit={handleSaveLimits} className="space-y-6">
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0 text-emerald-600">
+                <HiCash className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Deposit & bonus limits</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Set minimum and maximum deposit limits, withdrawal limits, and bonus percentage.</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Deposit & bonus limits</h2>
-              <p className="text-sm text-gray-500 mt-0.5">Set minimum and maximum deposit limits, withdrawal limits, and bonus percentage.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Minimum deposit limit (₹)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.limits?.minDepositFiat ?? defaultSettings.limits.minDepositFiat}
+                  onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, minDepositFiat: Number(e.target.value) || 0 } }))}
+                  disabled={!canEdit}
+                  className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Maximum deposit limit (₹)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.limits?.maxDepositFiat ?? defaultSettings.limits.maxDepositFiat}
+                  onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, maxDepositFiat: Number(e.target.value) || 0 } }))}
+                  disabled={!canEdit}
+                  className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Bonus percentage (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={form.limits?.bonusPercentage ?? defaultSettings.limits.bonusPercentage}
+                  onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, bonusPercentage: Number(e.target.value) || 0 } }))}
+                  disabled={!canEdit}
+                  className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Minimum withdrawal limit (₹)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.limits?.minWithdrawalFiat ?? defaultSettings.limits.minWithdrawalFiat}
+                  onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, minWithdrawalFiat: Number(e.target.value) || 0 } }))}
+                  disabled={!canEdit}
+                  className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Maximum withdrawal Limit (₹)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.limits?.maxWithdrawalFiatPerDay ?? defaultSettings.limits.maxWithdrawalFiatPerDay}
+                  onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, maxWithdrawalFiatPerDay: Number(e.target.value) || 0 } }))}
+                  disabled={!canEdit}
+                  className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">USDT Price (₹)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.limits?.usdtPrice ?? defaultSettings.limits.usdtPrice}
+                  onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, usdtPrice: Number(e.target.value) || 0 } }))}
+                  disabled={!canEdit}
+                  className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
+                />
+              </div>
             </div>
+            <div className="flex justify-center pt-4">
+              <button
+                type="submit"
+                disabled={!canEdit || limitsSaving}
+                className="flex items-center justify-center gap-2 w-full max-w-md px-6 py-3.5 rounded-xl bg-teal-500 text-white font-semibold hover:bg-teal-600 focus:ring-2 focus:ring-teal-500/50 focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <HiSave className="w-5 h-5" />
+                {limitsSaving ? 'Saving…' : 'Save limits'}
+              </button>
+            </div>
+            {!canEdit && (
+              <p className="text-center text-gray-500 text-sm mt-2">You need edit permission to change settings.</p>
+            )}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Minimum deposit limit (₹)</label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={form.limits?.minDepositFiat ?? defaultSettings.limits.minDepositFiat}
-                onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, minDepositFiat: Number(e.target.value) || 0 } }))}
-                disabled={!canEdit}
-                className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Maximum deposit limit (₹)</label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={form.limits?.maxDepositFiat ?? defaultSettings.limits.maxDepositFiat}
-                onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, maxDepositFiat: Number(e.target.value) || 0 } }))}
-                disabled={!canEdit}
-                className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Bonus percentage (%)</label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={form.limits?.bonusPercentage ?? defaultSettings.limits.bonusPercentage}
-                onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, bonusPercentage: Number(e.target.value) || 0 } }))}
-                disabled={!canEdit}
-                className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Minimum withdrawal limit (₹)</label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={form.limits?.minWithdrawalFiat ?? defaultSettings.limits.minWithdrawalFiat}
-                onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, minWithdrawalFiat: Number(e.target.value) || 0 } }))}
-                disabled={!canEdit}
-                className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Maximum withdrawal Limit (₹)</label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={form.limits?.maxWithdrawalFiatPerDay ?? defaultSettings.limits.maxWithdrawalFiatPerDay}
-                onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, maxWithdrawalFiatPerDay: Number(e.target.value) || 0 } }))}
-                disabled={!canEdit}
-                className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">USDT Price (₹)</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.limits?.usdtPrice ?? defaultSettings.limits.usdtPrice}
-                onChange={(e) => setForm((f) => ({ ...f, limits: { ...f.limits, usdtPrice: Number(e.target.value) || 0 } }))}
-                disabled={!canEdit}
-                className="w-full px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 focus:outline-none disabled:opacity-60"
-              />
-            </div>
-          </div>
-          <div className="flex justify-center pt-4">
-            <button
-              type="submit"
-              disabled={!canEdit || limitsSaving}
-              className="flex items-center justify-center gap-2 w-full max-w-md px-6 py-3.5 rounded-xl bg-teal-500 text-white font-semibold hover:bg-teal-600 focus:ring-2 focus:ring-teal-500/50 focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <HiSave className="w-5 h-5" />
-              {limitsSaving ? 'Saving…' : 'Save limits'}
-            </button>
-          </div>
-          {!canEdit && (
-            <p className="text-center text-gray-500 text-sm mt-2">You need edit permission to change settings.</p>
-          )}
-        </div>
-      </form>
+        </form>
       )}
     </div>
   )

@@ -7,7 +7,7 @@ const TOKEN_KEY = 'token'
 
 const defaultUser = {
   id: 1,
-  email: 'admin@crownbet.com',
+  email: 'admin@Betgugly.com',
   name: 'Admin User',
   role: 'super_admin',
 }

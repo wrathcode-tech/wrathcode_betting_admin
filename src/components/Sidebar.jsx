@@ -102,12 +102,10 @@ export default function Sidebar() {
       >
         {/* Logo */}
         <div className={`p-4 border-b border-gray-200 flex items-center gap-3 shrink-0 ${sidebarCollapsed ? 'justify-center' : ''}`}>
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center flex-shrink-0 text-white font-bold text-sm">
-            C
-          </div>
+          <img src="/favicon.svg" alt="logo" className="w-10 h-10" />
           {!sidebarCollapsed && (
             <div className="min-w-0">
-              <h1 className="text-lg font-bold text-gray-900 tracking-tight truncate">Crownbet</h1>
+              <h1 className="text-lg font-bold text-gray-900 tracking-tight truncate">Betgugly</h1>
               <p className="text-xs text-gray-500">Admin Panel</p>
             </div>
           )}

@@ -7,12 +7,12 @@ import { ROLES } from '../constants/roles'
 import AuthService from '../api/services/AuthService'
 
 const DEMO_ROLES = [
-  { role: ROLES.SUPER_ADMIN, name: 'Master Admin (Super Admin)', email: 'admin@crownbet.com' },
+  { role: ROLES.SUPER_ADMIN, name: 'Master Admin (Super Admin)', email: 'admin@betgugly.com' },
   { role: ROLES.SUB_ADMIN, name: 'Sub Admin (assigned users only)', email: '' },
-  { role: ROLES.ADMIN, name: 'Admin', email: 'admin@crownbet.com' },
-  { role: ROLES.FINANCE, name: 'Finance', email: 'finance@crownbet.com' },
-  { role: ROLES.RISK, name: 'Risk', email: 'risk@crownbet.com' },
-  { role: ROLES.SUPPORT, name: 'Support', email: 'support@crownbet.com' },
+  { role: ROLES.ADMIN, name: 'Admin', email: 'admin@betgugly.com' },
+  { role: ROLES.FINANCE, name: 'Finance', email: 'finance@betgugly.com' },
+  { role: ROLES.RISK, name: 'Risk', email: 'risk@betgugly.com' },
+  { role: ROLES.SUPPORT, name: 'Support', email: 'support@betgugly.com' },
 ]
 
 function loadSubAdmins(storageKey) {
@@ -22,7 +22,7 @@ function loadSubAdmins(storageKey) {
       const parsed = JSON.parse(raw)
       return Array.isArray(parsed) ? parsed : []
     }
-  } catch (_) {}
+  } catch (_) { }
   return []
 }
 
@@ -106,10 +106,8 @@ export default function Login() {
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 items-center justify-center text-white font-bold text-2xl shadow-lg mb-4">
-            C
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Crownbet</h1>
+          <img src="/logo.svg" alt="logo" className="w-full h-24" />
+          {/* <h1 className="text-2xl font-bold text-gray-900">Betgugly</h1> */}
           <p className="text-gray-500 text-sm mt-1">Admin – Sign in to your account</p>
         </div>
 
@@ -196,7 +194,7 @@ export default function Login() {
           </button>
         </form>
 
-        
+
       </div>
     </div>
   )

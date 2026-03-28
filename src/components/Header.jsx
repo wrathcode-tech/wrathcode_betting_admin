@@ -129,7 +129,7 @@ export default function Header() {
             </div>
             <div className="hidden sm:block text-left">
               <p className="text-sm font-medium text-gray-900 truncate max-w-[120px]">{user?.name || 'Admin'}</p>
-              <p className="text-xs text-gray-500">Crownbet Admin</p>
+              <p className="text-xs text-gray-500">Betgugly Admin</p>
             </div>
             <HiChevronDown className="w-4 h-4 text-gray-400" />
           </button>
