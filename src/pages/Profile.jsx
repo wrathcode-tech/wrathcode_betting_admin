@@ -4,12 +4,19 @@
  */
 import { useAuth } from '../context/AuthContext'
 import PageBanner from '../components/PageBanner'
-import { HiUser, HiMail, HiShieldCheck } from 'react-icons/hi'
+import { HiUser, HiMail, HiShieldCheck, HiHashtag } from 'react-icons/hi'
+
+function formatRoleLabel(role) {
+  const r = role || 'super_admin'
+  if (r === 'super_admin') return 'Master'
+  const spaced = String(r).replace(/_/g, ' ')
+  return spaced.replace(/\b\w/g, (c) => c.toUpperCase())
+}
 
 export default function Profile() {
   const { user } = useAuth()
 
-  const roleLabel = (user?.role || 'super_admin').replace(/_/g, ' ')
+  const roleLabel = formatRoleLabel(user?.role)
 
   return (
     <div className="space-y-6">
@@ -23,7 +30,7 @@ export default function Profile() {
             </div>
             <div>
               <h2 className="text-xl font-semibold text-gray-900">{user?.name || 'User'}</h2>
-              <p className="text-gray-500 text-sm capitalize">{roleLabel}</p>
+              <p className="text-gray-500 text-sm">{roleLabel}</p>
             </div>
           </div>
 
@@ -46,7 +53,14 @@ export default function Profile() {
               <HiShieldCheck className="w-5 h-5 text-gray-400 flex-shrink-0" />
               <div>
                 <p className="text-xs text-gray-500 uppercase font-medium">Role</p>
-                <p className="text-gray-800 capitalize">{roleLabel}</p>
+                <p className="text-gray-800">{roleLabel}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <HiHashtag className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              <div>
+                <p className="text-xs text-gray-500 uppercase font-medium">Referral code</p>
+                <p className="text-gray-800 font-mono text-sm">{user?.referralCode || '–'}</p>
               </div>
             </div>
           </div>

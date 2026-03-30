@@ -21,7 +21,7 @@ const AuthService = {
     return ApiCallGet(url, headers);
   },
 
-  /** GET /api/v1/master/admin-profit-summary → { success, data: { totalDeposits, totalWithdrawals, totalWalletBalance, profit, inProfit, inLoss, breakEven } } */
+  /** GET /api/v1/master/admin-profit-summary → { success, data: { totalDeposits, totalWithdrawals, totalWalletBalance, profit?, masterOverallProfit?: { totalProfit }, inProfit, inLoss, breakEven } } */
   getMasterAdminProfitSummary: async () => {
     const token = sessionStorage.getItem("token");
     if (!token) return { success: false, message: "Login required" };
@@ -764,6 +764,16 @@ const AuthService = {
     const url = `${baseUrl}${masterSubAdmin}/${encodeURIComponent(id)}`;
     const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
     return ApiCallDelete(url, headers);
+  },
+
+  /** GET /api/v1/master/weekly-profit → { success, data: { weekStartDate, weekEndDate, subAdminBreakdown, masterDirectStats, totalMasterProfit, ... } } */
+  getMasterWeeklyProfit: async () => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return { success: false, message: "Login required" };
+    const { baseUrl, masterWeeklyProfit } = ApiConfig;
+    const url = `${baseUrl}${masterWeeklyProfit}`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+    return ApiCallGet(url, headers);
   },
 
   /** GET /api/v1/master/sub-admin/settlements/pending?page=1&limit=20 – pending sub-admin settlements */

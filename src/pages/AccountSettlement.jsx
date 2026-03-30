@@ -1,8 +1,8 @@
 /**
- * Account Settlement – Sub-admin settlements: Pending, Settled, Rejected tabs
+ * Account Settlement – Weekly profit (GET /api/v1/master/weekly-profit) + sub-admin settlements: Pending, Settled, Rejected
  */
 import { useState, useEffect, useRef } from 'react'
-import { HiRefresh, HiChevronLeft, HiChevronRight, HiCheck, HiX } from 'react-icons/hi'
+import { HiRefresh, HiChevronLeft, HiChevronRight, HiCheck, HiX, HiChartBar } from 'react-icons/hi'
 import { useToast } from '../context/ToastContext'
 import AuthService from '../api/services/AuthService'
 import Modal from '../components/Modal'
@@ -57,6 +57,9 @@ export default function AccountSettlement() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [page, setPage] = useState(1)
+  const [weeklyProfit, setWeeklyProfit] = useState(null)
+  const [weeklyLoading, setWeeklyLoading] = useState(true)
+  const [weeklyError, setWeeklyError] = useState(null)
   const { addToast } = useToast()
   const fetchKeyRef = useRef(null)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
@@ -113,6 +116,26 @@ export default function AccountSettlement() {
       })
       .finally(() => setActionLoadingId(null))
   }
+
+  useEffect(() => {
+    setWeeklyLoading(true)
+    setWeeklyError(null)
+    AuthService.getMasterWeeklyProfit()
+      .then((res) => {
+        if (res?.success && res?.data) {
+          setWeeklyProfit(res.data)
+          setWeeklyError(null)
+        } else {
+          setWeeklyProfit(null)
+          setWeeklyError(res?.message || 'Failed to load weekly profit')
+        }
+      })
+      .catch(() => {
+        setWeeklyProfit(null)
+        setWeeklyError('Failed to load weekly profit')
+      })
+      .finally(() => setWeeklyLoading(false))
+  }, [refreshTrigger])
 
   useEffect(() => {
     const key = `${activeTab}-${page}-${refreshTrigger}`
@@ -180,6 +203,165 @@ export default function AccountSettlement() {
           {error}
         </div>
       )}
+
+      {/* Weekly profit – GET /api/v1/master/weekly-profit */}
+      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-4 border-b border-gray-200 bg-gradient-to-r from-teal-50/80 to-white">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center text-teal-600">
+              <HiChartBar className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Weekly profit</h2>
+              {weeklyProfit?.weekStartDate && weeklyProfit?.weekEndDate && (
+                <p className="text-sm text-gray-500 mt-0.5">
+                  {formatDateTime(weeklyProfit.weekStartDate)} – {formatDateTime(weeklyProfit.weekEndDate)}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => { setActiveTab('settled'); setPage(1) }}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-sm font-medium hover:bg-emerald-100"
+            >
+              <HiCheck className="w-4 h-4" /> Settled
+            </button>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('rejected'); setPage(1) }}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-50 text-red-800 border border-red-200 text-sm font-medium hover:bg-red-100"
+            >
+              <HiX className="w-4 h-4" /> Rejected
+            </button>
+          </div>
+        </div>
+        <div className="p-5 space-y-6">
+          {weeklyLoading ? (
+            <p className="text-sm text-gray-500 py-4">Loading weekly profit…</p>
+          ) : weeklyError ? (
+            <p className="text-sm text-red-600">{weeklyError}</p>
+          ) : weeklyProfit ? (
+            <>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-4">
+                  <p className="text-xs font-medium text-gray-500 uppercase">Total master profit</p>
+                  <p className="text-lg font-semibold text-gray-900 tabular-nums mt-1">₹{formatAmount(weeklyProfit.totalMasterProfit)}</p>
+                </div>
+                <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-4">
+                  <p className="text-xs font-medium text-gray-500 uppercase">Super admin share</p>
+                  <p className="text-lg font-semibold text-amber-700 tabular-nums mt-1">₹{formatAmount(weeklyProfit.superAdminShare)}</p>
+                </div>
+                <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-4">
+                  <p className="text-xs font-medium text-gray-500 uppercase">Master net (after super admin)</p>
+                  <p className="text-lg font-semibold text-teal-700 tabular-nums mt-1">₹{formatAmount(weeklyProfit.masterNetAfterSuperAdmin)}</p>
+                </div>
+                <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-4">
+                  <p className="text-xs font-medium text-gray-500 uppercase">Super admin commission</p>
+                  <p className="text-lg font-semibold text-gray-900 tabular-nums mt-1">
+                    {weeklyProfit.superAdminCommissionPercent != null ? `${weeklyProfit.superAdminCommissionPercent}%` : '–'}
+                  </p>
+                </div>
+              </div>
+
+              {weeklyProfit.masterDirectStats && (
+                <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4">
+                  <h3 className="text-sm font-semibold text-gray-800 mb-3">Master direct</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">Total deposit</span>
+                      <p className="font-medium text-gray-900 tabular-nums">₹{formatAmount(weeklyProfit.masterDirectStats.totalDeposit)}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Total withdrawal</span>
+                      <p className="font-medium text-gray-900 tabular-nums">₹{formatAmount(weeklyProfit.masterDirectStats.totalWithdrawal)}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Net amount</span>
+                      <p className="font-medium text-emerald-700 tabular-nums">₹{formatAmount(weeklyProfit.masterDirectStats.netAmount)}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {Array.isArray(weeklyProfit.subAdminBreakdown) && weeklyProfit.subAdminBreakdown.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-800 mb-3">Sub-admin breakdown</h3>
+                  <div className="overflow-x-auto rounded-xl border border-gray-200">
+                    <table className="w-full min-w-[720px] text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200 text-left text-xs font-semibold text-gray-500 uppercase">
+                          <th className="py-2.5 px-3">Sub-admin ID</th>
+                          <th className="py-2.5 px-3 text-right">Deposit</th>
+                          <th className="py-2.5 px-3 text-right">Withdrawal</th>
+                          <th className="py-2.5 px-3 text-right">Net</th>
+                          <th className="py-2.5 px-3 text-right">Master share</th>
+                          <th className="py-2.5 px-3 text-right">Sub-admin share</th>
+                          <th className="py-2.5 px-3 text-right">Commission %</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {weeklyProfit.subAdminBreakdown.map((row, idx) => (
+                          <tr key={row.subAdminId || idx} className="border-b border-gray-100 hover:bg-gray-50/80">
+                            <td className="py-3 px-3 font-mono text-xs text-gray-800 break-all max-w-[200px]">{row.subAdminId || '–'}</td>
+                            <td className="py-3 px-3 text-right tabular-nums">₹{formatAmount(row.totalDeposit)}</td>
+                            <td className="py-3 px-3 text-right tabular-nums">₹{formatAmount(row.totalWithdrawal)}</td>
+                            <td className="py-3 px-3 text-right tabular-nums font-medium">₹{formatAmount(row.netAmount)}</td>
+                            <td className="py-3 px-3 text-right tabular-nums text-teal-700">₹{formatAmount(row.masterShare)}</td>
+                            <td className="py-3 px-3 text-right tabular-nums">₹{formatAmount(row.subAdminShare)}</td>
+                            <td className="py-3 px-3 text-right tabular-nums">{row.commissionSharing != null ? `${row.commissionSharing}%` : '–'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {Array.isArray(weeklyProfit.dailyStats) && weeklyProfit.dailyStats.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-800 mb-3">Daily stats</h3>
+                  <div className="overflow-x-auto rounded-xl border border-gray-200">
+                    <table className="w-full min-w-[640px] text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200 text-left text-xs font-semibold text-gray-500 uppercase">
+                          <th className="py-2.5 px-3">Date</th>
+                          <th className="py-2.5 px-3 text-right">Deposit</th>
+                          <th className="py-2.5 px-3 text-right">Withdrawal</th>
+                          <th className="py-2.5 px-3 text-right">Profit</th>
+                          <th className="py-2.5 px-3 text-right">Super admin share</th>
+                          <th className="py-2.5 px-3">Computed at</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {weeklyProfit.dailyStats.map((d, idx) => (
+                          <tr key={`${d.date}-${idx}`} className="border-b border-gray-100 hover:bg-gray-50/80">
+                            <td className="py-3 px-3 text-gray-800">{d.date || '–'}</td>
+                            <td className="py-3 px-3 text-right tabular-nums">₹{formatAmount(d.totalDeposit)}</td>
+                            <td className="py-3 px-3 text-right tabular-nums">₹{formatAmount(d.totalWithdrawal)}</td>
+                            <td className="py-3 px-3 text-right tabular-nums font-medium">₹{formatAmount(d.totalProfit)}</td>
+                            <td className="py-3 px-3 text-right tabular-nums">₹{formatAmount(d.superAdminShare)}</td>
+                            <td className="py-3 px-3 text-gray-500 text-xs whitespace-nowrap">{formatDateTime(d.computedAt)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {weeklyProfit.lastSyncedAt && (
+                <p className="text-xs text-gray-400">
+                  Last synced: {formatDateTime(weeklyProfit.lastSyncedAt)}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-gray-500">No weekly profit data.</p>
+          )}
+        </div>
+      </div>
 
       {/* Tabs */}
       <div className="flex gap-1 p-1 rounded-xl bg-gray-100 border border-gray-200 w-fit">
@@ -273,7 +455,7 @@ export default function AccountSettlement() {
                             disabled={actionLoadingId === row._id}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-700 hover:bg-emerald-200 disabled:opacity-50"
                           >
-                            <HiCheck className="w-4 h-4" /> Settle
+                            <HiCheck className="w-4 h-4" /> Settled
                           </button>
                           <button
                             type="button"
@@ -281,7 +463,7 @@ export default function AccountSettlement() {
                             disabled={actionLoadingId === row._id}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50"
                           >
-                            <HiX className="w-4 h-4" /> Reject
+                            <HiX className="w-4 h-4" /> Rejected
                           </button>
                         </div>
                       </td>

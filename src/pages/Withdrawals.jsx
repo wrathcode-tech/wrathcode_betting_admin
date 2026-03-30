@@ -37,6 +37,14 @@ function userLabel(w) {
   return extra ? `${name} (${extra})` : name
 }
 
+/** User-facing UUID for list/export (nested userId.uuid or top-level uuid) – not Mongo _id */
+function getUserDisplayUuid(w) {
+  const u = w?.userId
+  if (u && typeof u === 'object' && u.uuid != null && u.uuid !== '') return String(u.uuid)
+  if (w?.uuid != null && w.uuid !== '') return String(w.uuid)
+  return ''
+}
+
 /** User ID string for API (withdrawal.userId may be object with _id or string) */
 function getWithdrawalUserId(w) {
   const u = w?.userId
@@ -118,6 +126,7 @@ export default function Withdrawals() {
     ? withdrawals.filter(
         (w) =>
           (w.uuid && String(w.uuid).toLowerCase().includes(search.toLowerCase())) ||
+          (w.userId?.uuid && String(w.userId.uuid).toLowerCase().includes(search.toLowerCase())) ||
           (w._id && String(w._id).toLowerCase().includes(search.toLowerCase())) ||
           (w.userId?.mobile && String(w.userId.mobile).includes(search)) ||
           (w.userId?.fullName && w.userId.fullName.toLowerCase().includes(search.toLowerCase())) ||
@@ -210,7 +219,7 @@ export default function Withdrawals() {
     const headers = ['User ID', 'User', 'Amount', 'Status', 'Withdrawal To', 'Processed', 'Created']
     const rows = filtered.map((w) =>
       [
-        w.uuid ?? w._id,
+        getUserDisplayUuid(w) || '–',
         userLabel(w),
         w.amount,
         statusLabel(w.status),
@@ -331,10 +340,12 @@ export default function Withdrawals() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((w) => (
+                filtered.map((w) => {
+                  const userUuid = getUserDisplayUuid(w)
+                  return (
                   <tr key={w._id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-4 px-5 text-teal-600 font-mono text-sm truncate max-w-[120px]" title={w.uuid ?? w._id}>
-                      {w.uuid ?? w._id ?? '–'}
+                    <td className="py-4 px-5 text-teal-600 font-mono text-sm truncate max-w-[120px]" title={userUuid || undefined}>
+                      {userUuid || '–'}
                     </td>
                     <td className="py-4 px-5 text-gray-900 font-medium">{userLabel(w)}</td>
                     <td className="py-4 px-5 font-medium text-gray-900">{formatAmount(w)}</td>
@@ -395,7 +406,8 @@ export default function Withdrawals() {
                       </td>
                     )}
                   </tr>
-                ))
+                  )
+                })
               )}
             </tbody>
           </table>
@@ -483,10 +495,10 @@ export default function Withdrawals() {
                         <dd className="text-gray-900 break-all">{viewDetailWithdrawal.userId.email}</dd>
                       </div>
                     )}
-                    {viewDetailWithdrawal.userId._id != null && (
+                    {getUserDisplayUuid(viewDetailWithdrawal) && (
                       <div className="sm:col-span-2">
                         <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-0.5">User ID</dt>
-                        <dd className="text-gray-900 font-mono text-xs break-all mt-0.5 p-2 rounded-lg bg-white border border-gray-100">{viewDetailWithdrawal.userId._id}</dd>
+                        <dd className="text-gray-900 font-mono text-xs break-all mt-0.5 p-2 rounded-lg bg-white border border-gray-100">{getUserDisplayUuid(viewDetailWithdrawal)}</dd>
                       </div>
                     )}
                   </dl>

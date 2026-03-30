@@ -93,6 +93,10 @@ function buildSupportCards(counts) {
 /** Build Admin Stats cards from GET /api/v1/master/admin-profit-summary */
 function buildAdminStatsCards(data) {
   if (!data || typeof data !== 'object') return []
+  const profitValue =
+    data.masterOverallProfit?.totalProfit != null
+      ? data.masterOverallProfit.totalProfit
+      : data.profit
   const profitStyle = data.inProfit
     ? { borderColor: 'border-emerald-500', iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-600' }
     : data.inLoss
@@ -102,7 +106,7 @@ function buildAdminStatsCards(data) {
     { label: 'Total Deposits', value: formatAmount(data.totalDeposits), unit: '', icon: HiArrowDown, borderColor: 'border-green-500', iconBg: 'bg-green-500/10', iconColor: 'text-green-600' },
     { label: 'Total Withdrawals', value: formatAmount(data.totalWithdrawals), unit: '', icon: HiArrowUp, borderColor: 'border-orange-500', iconBg: 'bg-orange-500/10', iconColor: 'text-orange-600' },
     { label: 'Total Wallet Balance', value: formatAmount(data.totalWalletBalance), unit: '', icon: HiCash, borderColor: 'border-indigo-500', iconBg: 'bg-indigo-500/10', iconColor: 'text-indigo-600' },
-    { label: 'Profit', value: formatAmount(data.profit), unit: '', icon: HiChartBar, ...profitStyle },
+    { label: 'Profit', value: formatAmount(profitValue), unit: '', icon: HiChartBar, ...profitStyle },
   ]
 }
 
@@ -333,25 +337,25 @@ export default function Dashboard() {
       )}
 
       {/* GAMING */}
-      {(canViewGames || canViewReports) && (
+      {/* {(canViewGames || canViewReports) && (
         <Section
           title="Gaming"
           cards={dashboardLoading ? [] : gamesCards}
           loading={dashboardLoading}
         />
-      )}
+      )} */}
 
       {/* BETS – GET /api/v1/master/bets/amount-stats */}
-      {(canViewGames || canViewReports) && (
+      {/* {(canViewGames || canViewReports) && (
         <Section
           title="Bets"
           cards={betsAmountStatsLoading ? [] : betsCards}
           loading={betsAmountStatsLoading}
         />
-      )}
+      )} */}
 
       {/* BONUSES */}
-      {canViewBonuses && <Section title="Bonuses" cards={BONUSES} />}
+      {/* {canViewBonuses && <Section title="Bonuses" cards={BONUSES} />} */}
 
       {/* SUPPORT – GET /api/v1/master/support-ticket-counts */}
       {canViewTickets && (

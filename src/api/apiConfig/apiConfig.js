@@ -10,6 +10,7 @@ export const ApiConfig = {
   masterDashboard: "/api/v1/master/dashboard",
   masterAdminLogs: "/api/v1/master/admin-logs",
   masterAdminProfitSummary: "/api/v1/master/admin-profit-summary",
+  masterWeeklyProfit: "/api/v1/master/weekly-profit",
   masterUsers: "/api/v1/master/users",
   masterDepositRequests: "/api/v1/master/deposit-requests",
   masterWithdrawalRequests: "/api/v1/master/withdrawal-requests",

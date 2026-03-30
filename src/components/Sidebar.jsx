@@ -11,17 +11,14 @@ import {
   HiArrowDown,
   HiArrowUp,
   HiCurrencyDollar,
-  HiCollection,
   HiTicket,
   HiGift,
-  HiUserGroup,
   HiShieldExclamation,
   HiDocumentReport,
   HiDocumentText,
   HiSupport,
   HiBell,
   HiClipboardList,
-  HiCog,
   HiCreditCard,
   HiChevronLeft,
   HiLogout,
@@ -34,11 +31,24 @@ import AuthService from '../api/services/AuthService'
 
 const navSections = [
   { key: 'main', label: 'MAIN', pill: 'ACTIVE', items: [{ to: '/', label: 'Dashboard', icon: HiChartBar, permission: PERMISSIONS.VIEW_DASHBOARD }] },
-  { key: 'platform', label: 'PLATFORM', pill: 'ACTIVE', items: [{ to: '/settings', label: 'Settings', icon: HiCog, permission: PERMISSIONS.VIEW_SETTINGS }] },
+  // Settings tab hidden from sidebar (route /settings still works if opened directly)
+  // { key: 'platform', label: 'PLATFORM', pill: 'ACTIVE', items: [{ to: '/settings', label: 'Settings', icon: HiCog, permission: PERMISSIONS.VIEW_SETTINGS }] },
   { key: 'admin', label: 'ADMIN', items: [{ to: '/sub-admins', label: 'Sub Admin Management', icon: HiUsers, permission: PERMISSIONS.MANAGE_ROLES }, { to: '/audit-logs', label: 'Admin Logs', icon: HiClipboardList, permission: PERMISSIONS.VIEW_AUDIT_LOG }, { to: '/deposit-accounts', label: 'Deposit Accounts', icon: HiCreditCard, permission: PERMISSIONS.VIEW_DEPOSITS }] },
   { key: 'traders', label: 'TRADERS', items: [{ to: '/users', label: 'User List', icon: HiUsers, permission: PERMISSIONS.VIEW_USERS }] },
   { key: 'wallets', label: 'WALLETS & MONEY', items: [{ to: '/wallets', label: 'Wallets', icon: HiCash, permission: PERMISSIONS.VIEW_WALLETS }, { to: '/deposits', label: 'Deposits', icon: HiArrowDown, permission: PERMISSIONS.VIEW_DEPOSITS }, { to: '/withdrawals', label: 'Withdrawals', icon: HiArrowUp, permission: PERMISSIONS.VIEW_WITHDRAWALS }, { to: '/transactions', label: 'Transactions', icon: HiCurrencyDollar, permission: PERMISSIONS.VIEW_TRANSACTIONS }, { to: '/account-settlement', label: 'Account Statement', icon: HiDocumentReport, permission: PERMISSIONS.VIEW_ACCOUNT_STATEMENT }] },
-  { key: 'gaming', label: 'GAMING', pill: 'ON', items: [{ to: '/games', label: 'Games', icon: HiCollection, permission: PERMISSIONS.VIEW_GAMES }, { to: '/bets', label: 'Bets', icon: HiTicket, permission: PERMISSIONS.MANAGE_BETTING }, { to: '/casino-history', label: 'Games History', icon: HiTicket, permission: PERMISSIONS.VIEW_CASINO_HISTORY }, { to: '/referrals', label: 'Referrals', icon: HiUserGroup, permission: PERMISSIONS.VIEW_REFERRALS }] },
+  {
+    key: 'gaming',
+    label: 'GAMING',
+    pill: 'ON',
+    items: [
+      // Games tab hidden from sidebar (route /games still works if opened directly)
+      // { to: '/games', label: 'Games', icon: HiCollection, permission: PERMISSIONS.VIEW_GAMES },
+      { to: '/bets', label: 'Bets', icon: HiTicket, permission: PERMISSIONS.MANAGE_BETTING },
+      { to: '/casino-history', label: 'Games History', icon: HiTicket, permission: PERMISSIONS.VIEW_CASINO_HISTORY },
+      // Referrals tab hidden from sidebar (route /referrals still works if opened directly)
+      // { to: '/referrals', label: 'Referrals', icon: HiUserGroup, permission: PERMISSIONS.VIEW_REFERRALS },
+    ],
+  },
   { key: 'risk', label: 'RISK & REPORTS', items: [{ to: '/reports', label: 'Reports', icon: HiDocumentReport, permission: PERMISSIONS.VIEW_REPORTS }] },
   { key: 'content', label: 'CONTENT & SUPPORT', items: [{ to: '/support', label: 'Support', icon: HiSupport, permission: PERMISSIONS.VIEW_TICKETS }, { to: '/notifications', label: 'Notifications', icon: HiBell, permission: PERMISSIONS.VIEW_NOTIFICATIONS }] },
 ]
