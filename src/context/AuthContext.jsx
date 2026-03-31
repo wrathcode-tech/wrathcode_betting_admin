@@ -108,13 +108,15 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
-  function hasPermission(permission) {
+  /** UI access: all authenticated users pass (role-based permission list not enforced in admin panel). */
+  function hasPermission(_permission) {
     if (!user) return false
-    return permissions.includes(permission)
+    return true
   }
 
-  function hasAnyPermission(...perms) {
-    return perms.some((p) => hasPermission(p))
+  function hasAnyPermission(..._perms) {
+    if (!user) return false
+    return true
   }
 
   return (

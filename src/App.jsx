@@ -4,7 +4,6 @@ import { ToastProvider } from './context/ToastContext'
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
-import { PERMISSIONS } from './constants/roles'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Users from './pages/Users'
@@ -73,29 +72,29 @@ export default function App() {
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_DASHBOARD}><Dashboard /></ProtectedRoute>} />
-                <Route path="users" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_USERS}><Users /></ProtectedRoute>} />
-                <Route path="users/:userId" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_USERS}><UserDetails /></ProtectedRoute>} />
-                <Route path="sub-admins" element={<ProtectedRoute requiredPermission={PERMISSIONS.MANAGE_ROLES}><SubAdminManagement /></ProtectedRoute>} />
-                <Route path="wallets" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_WALLETS}><Wallets /></ProtectedRoute>} />
-                <Route path="games" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_GAMES}><Games /></ProtectedRoute>} />
-                <Route path="bets" element={<ProtectedRoute requiredPermission={PERMISSIONS.MANAGE_BETTING}><Bets /></ProtectedRoute>} />
-                <Route path="casino-history" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_CASINO_HISTORY}><CasinoHistory /></ProtectedRoute>} />
-                <Route path="deposits" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_DEPOSITS}><Deposits /></ProtectedRoute>} />
-                <Route path="withdrawals" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_WITHDRAWALS}><Withdrawals /></ProtectedRoute>} />
-                <Route path="transactions" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_TRANSACTIONS}><Transactions /></ProtectedRoute>} />
-                <Route path="account-settlement" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_ACCOUNT_STATEMENT}><AccountSettlement /></ProtectedRoute>} />
-                <Route path="bonuses" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_BONUSES}><Bonuses /></ProtectedRoute>} />
-                <Route path="referrals" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_REFERRALS}><Referrals /></ProtectedRoute>} />
-                <Route path="risk-fraud" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_RISK}><RiskFraud /></ProtectedRoute>} />
-                <Route path="reports" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_REPORTS}><Reports /></ProtectedRoute>} />
-                <Route path="cms" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_CMS}><CMS /></ProtectedRoute>} />
-                <Route path="support" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_TICKETS}><Support /></ProtectedRoute>} />
-                <Route path="notifications" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_NOTIFICATIONS}><Notifications /></ProtectedRoute>} />
-                <Route path="audit-logs" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_AUDIT_LOG}><AuditLogs /></ProtectedRoute>} />
-                <Route path="deposit-accounts" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_DEPOSITS}><DepositAccounts /></ProtectedRoute>} />
+                <Route index element={<Dashboard />} />
+                <Route path="users" element={<Users />} />
+                <Route path="users/:userId" element={<UserDetails />} />
+                <Route path="sub-admins" element={<SubAdminManagement />} />
+                <Route path="wallets" element={<Wallets />} />
+                <Route path="games" element={<Games />} />
+                <Route path="bets" element={<Bets />} />
+                <Route path="casino-history" element={<CasinoHistory />} />
+                <Route path="deposits" element={<Deposits />} />
+                <Route path="withdrawals" element={<Withdrawals />} />
+                <Route path="transactions" element={<Transactions />} />
+                <Route path="account-settlement" element={<AccountSettlement />} />
+                <Route path="bonuses" element={<Bonuses />} />
+                <Route path="referrals" element={<Referrals />} />
+                <Route path="risk-fraud" element={<RiskFraud />} />
+                <Route path="reports" element={<Reports />} />
+                <Route path="cms" element={<CMS />} />
+                <Route path="support" element={<Support />} />
+                <Route path="notifications" element={<Notifications />} />
+                <Route path="audit-logs" element={<AuditLogs />} />
+                <Route path="deposit-accounts" element={<DepositAccounts />} />
                 <Route path="profile" element={<Profile />} />
-                <Route path="settings" element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_SETTINGS}><Settings /></ProtectedRoute>} />
+                <Route path="settings" element={<Settings />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

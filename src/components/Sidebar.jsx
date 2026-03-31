@@ -12,10 +12,7 @@ import {
   HiArrowUp,
   HiCurrencyDollar,
   HiTicket,
-  HiGift,
-  HiShieldExclamation,
   HiDocumentReport,
-  HiDocumentText,
   HiSupport,
   HiBell,
   HiClipboardList,
@@ -26,36 +23,35 @@ import {
 import { useLayout } from '../context/LayoutContext'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import { PERMISSIONS } from '../constants/roles'
 import AuthService from '../api/services/AuthService'
 
 const navSections = [
-  { key: 'main', label: 'MAIN', pill: 'ACTIVE', items: [{ to: '/', label: 'Dashboard', icon: HiChartBar, permission: PERMISSIONS.VIEW_DASHBOARD }] },
+  { key: 'main', label: 'MAIN', pill: 'ACTIVE', items: [{ to: '/', label: 'Dashboard', icon: HiChartBar }] },
   // Settings tab hidden from sidebar (route /settings still works if opened directly)
-  // { key: 'platform', label: 'PLATFORM', pill: 'ACTIVE', items: [{ to: '/settings', label: 'Settings', icon: HiCog, permission: PERMISSIONS.VIEW_SETTINGS }] },
-  { key: 'admin', label: 'ADMIN', items: [{ to: '/sub-admins', label: 'Sub Admin Management', icon: HiUsers, permission: PERMISSIONS.MANAGE_ROLES }, { to: '/audit-logs', label: 'Admin Logs', icon: HiClipboardList, permission: PERMISSIONS.VIEW_AUDIT_LOG }, { to: '/deposit-accounts', label: 'Deposit Accounts', icon: HiCreditCard, permission: PERMISSIONS.VIEW_DEPOSITS }] },
-  { key: 'traders', label: 'TRADERS', items: [{ to: '/users', label: 'User List', icon: HiUsers, permission: PERMISSIONS.VIEW_USERS }] },
-  { key: 'wallets', label: 'WALLETS & MONEY', items: [{ to: '/wallets', label: 'Wallets', icon: HiCash, permission: PERMISSIONS.VIEW_WALLETS }, { to: '/deposits', label: 'Deposits', icon: HiArrowDown, permission: PERMISSIONS.VIEW_DEPOSITS }, { to: '/withdrawals', label: 'Withdrawals', icon: HiArrowUp, permission: PERMISSIONS.VIEW_WITHDRAWALS }, { to: '/transactions', label: 'Transactions', icon: HiCurrencyDollar, permission: PERMISSIONS.VIEW_TRANSACTIONS }, { to: '/account-settlement', label: 'Account Statement', icon: HiDocumentReport, permission: PERMISSIONS.VIEW_ACCOUNT_STATEMENT }] },
+  // { key: 'platform', label: 'PLATFORM', pill: 'ACTIVE', items: [{ to: '/settings', label: 'Settings', icon: HiCog }] },
+  { key: 'admin', label: 'ADMIN', items: [{ to: '/sub-admins', label: 'Sub Admin Management', icon: HiUsers }, { to: '/audit-logs', label: 'Admin Logs', icon: HiClipboardList }, { to: '/deposit-accounts', label: 'Deposit Accounts', icon: HiCreditCard }] },
+  { key: 'traders', label: 'TRADERS', items: [{ to: '/users', label: 'User List', icon: HiUsers }] },
+  { key: 'wallets', label: 'WALLETS & MONEY', items: [{ to: '/wallets', label: 'Wallets', icon: HiCash }, { to: '/deposits', label: 'Deposits', icon: HiArrowDown }, { to: '/withdrawals', label: 'Withdrawals', icon: HiArrowUp }, { to: '/transactions', label: 'Transactions', icon: HiCurrencyDollar }, { to: '/account-settlement', label: 'Account Statement', icon: HiDocumentReport }] },
   {
     key: 'gaming',
     label: 'GAMING',
     pill: 'ON',
     items: [
       // Games tab hidden from sidebar (route /games still works if opened directly)
-      // { to: '/games', label: 'Games', icon: HiCollection, permission: PERMISSIONS.VIEW_GAMES },
-      { to: '/bets', label: 'Bets', icon: HiTicket, permission: PERMISSIONS.MANAGE_BETTING },
-      { to: '/casino-history', label: 'Games History', icon: HiTicket, permission: PERMISSIONS.VIEW_CASINO_HISTORY },
+      // { to: '/games', label: 'Games', icon: HiCollection },
+      { to: '/bets', label: 'Bets', icon: HiTicket },
+      { to: '/casino-history', label: 'Games History', icon: HiTicket },
       // Referrals tab hidden from sidebar (route /referrals still works if opened directly)
-      // { to: '/referrals', label: 'Referrals', icon: HiUserGroup, permission: PERMISSIONS.VIEW_REFERRALS },
+      // { to: '/referrals', label: 'Referrals', icon: HiUserGroup },
     ],
   },
-  { key: 'risk', label: 'RISK & REPORTS', items: [{ to: '/reports', label: 'Reports', icon: HiDocumentReport, permission: PERMISSIONS.VIEW_REPORTS }] },
-  { key: 'content', label: 'CONTENT & SUPPORT', items: [{ to: '/support', label: 'Support', icon: HiSupport, permission: PERMISSIONS.VIEW_TICKETS }, { to: '/notifications', label: 'Notifications', icon: HiBell, permission: PERMISSIONS.VIEW_NOTIFICATIONS }] },
+  { key: 'risk', label: 'RISK & REPORTS', items: [{ to: '/reports', label: 'Reports', icon: HiDocumentReport }] },
+  { key: 'content', label: 'CONTENT & SUPPORT', items: [{ to: '/support', label: 'Support', icon: HiSupport }, { to: '/notifications', label: 'Notifications', icon: HiBell }] },
 ]
 
 export default function Sidebar() {
   const { sidebarCollapsed, toggleSidebar, sidebarMobileOpen, closeMobileSidebar } = useLayout()
-  const { hasPermission, logout } = useAuth()
+  const { logout } = useAuth()
   const { addToast } = useToast()
   const navigate = useNavigate()
   const [pendingDeposits, setPendingDeposits] = useState(0)
@@ -63,28 +59,22 @@ export default function Sidebar() {
   const [pendingTickets, setPendingTickets] = useState(0)
 
   useEffect(() => {
-    if (hasPermission(PERMISSIONS.VIEW_DEPOSITS)) {
-      AuthService.getMasterDepositRequestsPending({ page: 1, limit: 1 })
-        .then((res) => {
-          if (res?.success && res?.data?.pagination != null) setPendingDeposits(res.data.pagination.total ?? 0)
-        })
-        .catch(() => setPendingDeposits(0))
-    }
-    if (hasPermission(PERMISSIONS.VIEW_WITHDRAWALS)) {
-      AuthService.getMasterWithdrawalRequestsPending({ page: 1, limit: 1 })
-        .then((res) => {
-          if (res?.success && res?.data?.pagination != null) setPendingWithdrawals(res.data.pagination.total ?? 0)
-        })
-        .catch(() => setPendingWithdrawals(0))
-    }
-    if (hasPermission(PERMISSIONS.VIEW_TICKETS)) {
-      AuthService.getSupportAdminTickets({ status: 'open', page: 1, limit: 1 })
-        .then((res) => {
-          if (res?.success && res?.data != null) setPendingTickets(res.data.total ?? 0)
-        })
-        .catch(() => setPendingTickets(0))
-    }
-  }, [hasPermission])
+    AuthService.getMasterDepositRequestsPending({ page: 1, limit: 1 })
+      .then((res) => {
+        if (res?.success && res?.data?.pagination != null) setPendingDeposits(res.data.pagination.total ?? 0)
+      })
+      .catch(() => setPendingDeposits(0))
+    AuthService.getMasterWithdrawalRequestsPending({ page: 1, limit: 1 })
+      .then((res) => {
+        if (res?.success && res?.data?.pagination != null) setPendingWithdrawals(res.data.pagination.total ?? 0)
+      })
+      .catch(() => setPendingWithdrawals(0))
+    AuthService.getSupportAdminTickets({ status: 'open', page: 1, limit: 1 })
+      .then((res) => {
+        if (res?.success && res?.data != null) setPendingTickets(res.data.total ?? 0)
+      })
+      .catch(() => setPendingTickets(0))
+  }, [])
 
   const linkClass = ({ isActive }) =>
     `flex items-center gap-3 px-3 py-2.5 rounded-r-lg text-sm font-medium transition-all duration-200 border-l-4 ${isActive ? 'bg-teal-50 text-teal-700 border-l-teal-500' : 'border-l-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -124,7 +114,7 @@ export default function Sidebar() {
         {/* Nav: section labels + links (scrollable when many items) */}
         <nav className="flex-1 min-h-0 py-4 px-3 overflow-y-auto overflow-x-hidden space-y-6">
           {navSections.map((section) => {
-            const visibleItems = section.items.filter((item) => hasPermission(item.permission))
+            const visibleItems = section.items
             if (visibleItems.length === 0) return null
             const pillLabel = section.pill
             return (
